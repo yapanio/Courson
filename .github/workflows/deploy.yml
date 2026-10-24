@@ -40,7 +40,7 @@ jobs:
 
       - name: Chạy lệnh Deploy qua SSH
         env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_HOST: ${{ secrets.SERVER_HOST }}
         run: |
           ssh $SSH_HOST << 'EOF'
             set -e
