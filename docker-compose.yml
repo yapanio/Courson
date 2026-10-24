@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: sa
       POSTGRES_DB: courson_db
     ports:
-      - "5433:5432" # Chỉ mở cổng DB ra ngoài máy thật nếu muốn dùng DBeaver soi dữ liệu
+      - "5433:5432" # Chỉ mở cổng DB ra ngoài máy thật nếu muốn dùng DBeaver soi dữ liệu.
     volumes:
       - pgdata_local:/var/lib/postgresql/data
       - ./database/file_tao_bang_chinh.sql:/docker-entrypoint-initdb.d/01-init-tables.sql:ro
