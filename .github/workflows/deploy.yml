@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Đảm bảo chỉ chạy khi push trực tiếp vào nhánh deploy (bảo mật cho Public Repo)
+    # Đảm bảo chỉ chạy khi push trực tiếp vào nhánh deploy (bảo mật cho Public Repo).
     if: github.ref == 'refs/heads/deploy'
     
     steps:
