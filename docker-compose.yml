@@ -11,8 +11,8 @@ services:
       - "5433:5432" # Chỉ mở cổng DB ra ngoài máy thật nếu muốn dùng DBeaver soi dữ liệu.
     volumes:
       - pgdata_local:/var/lib/postgresql/data
-      - ./database/file_tao_bang_chinh.sql:/docker-entrypoint-initdb.d/01-init-tables.sql:ro
-      - ./database/file_du_lieu_mau.sql:/docker-entrypoint-initdb.d/02-seed-data.sql:ro
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-init-tables.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed-data.sql:ro
     networks:
       - courson-net
 
