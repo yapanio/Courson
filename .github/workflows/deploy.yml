@@ -1,23 +1,48 @@
-name: Deploy to Debian Server
+name: Deploy to Local Debian Server
 
 on:
   push:
     branches:
-      - deploy 
+      - deploy
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    # Đảm bảo chỉ chạy khi push trực tiếp vào nhánh deploy (bảo mật cho Public Repo)
+    if: github.ref == 'refs/heads/deploy'
+    
     steps:
-      - name: Deploy qua SSH vào Debian
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_SSH_PORT }}
-          script: |
+      - name: Cài đặt Cloudflared & Cấu hình SSH
+        env:
+          # Đảm bảo tên các biến secrets.* dưới đây khớp với tên bạn đặt trong GitHub Settings
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }} 
+          SSH_HOST: ${{ secrets.SSH_HOST }}       # Ví dụ: ssh.tenmiencuaban.com
+          SSH_USER: ${{ secrets.SSH_USER }}       # Ví dụ: debian
+        run: |
+          # 1. Tải và cài đặt cloudflared lên máy ảo của GitHub
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+
+          # 2. Tạo file chứa SSH Private Key
+          mkdir -p ~/.ssh
+          printf "%s\n" "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          # 3. Cấu hình SSH tự động bọc kết nối qua Cloudflare Tunnel
+          cat <<EOF >> ~/.ssh/config
+          Host $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/id_rsa
+            ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+          EOF
+
+      - name: Chạy lệnh Deploy qua SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          ssh $SSH_HOST << 'EOF'
             set -e
             echo "=== ĐANG CẬP NHẬT MÃ NGUỒN TRÊN DEBIAN ==="
             cd /home/debian/courson-deploy
@@ -30,7 +55,8 @@ jobs:
             docker compose down web-app
             docker compose up -d --build
 
-            # 3. Dọn dẹp các Docker image cũ không còn dùng để tiết kiệm ổ cứng
+            # 3. Dọn dẹp các Docker image cũ không còn dùng
             docker image prune -f
-            
+
             echo "=== TRIỂN KHAI THÀNH CÔNG ==="
+          EOF
