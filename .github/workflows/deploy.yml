@@ -3,7 +3,7 @@ name: Deploy to Debian Server
 on:
   push:
     branches:
-      - deploy # Chỉ kích hoạt khi có commit mới đẩy lên nhánh deploy
+      - deploy 
 
 jobs:
   deploy:
