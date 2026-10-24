@@ -15,9 +15,9 @@ jobs:
       - name: Cài đặt Cloudflared & Cấu hình SSH
         env:
           # Đảm bảo tên các biến secrets.* dưới đây khớp với tên bạn đặt trong GitHub Settings
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }} 
-          SSH_HOST: ${{ secrets.SSH_HOST }}       # Ví dụ: ssh.tenmiencuaban.com
-          SSH_USER: ${{ secrets.SSH_USER }}       # Ví dụ: debian
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }} 
+          SSH_HOST: ${{ secrets.SERVER_HOST }}       # Ví dụ: ssh.tenmiencuaban.com
+          SSH_USER: ${{ secrets.SERVER_USER }}       # Ví dụ: debian
         run: |
           # 1. Tải và cài đặt cloudflared lên máy ảo của GitHub
           curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
