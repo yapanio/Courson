@@ -45,7 +45,7 @@ jobs:
           ssh $SSH_HOST << 'EOF'
             set -e
             echo "=== ĐANG CẬP NHẬT MÃ NGUỒN TRÊN DEBIAN ==="
-            cd /home/debian/courson-deploy
+            cd /home/nhnhat206/Desktop/Courson_deploy/Courson
 
             # 1. Kéo code mới nhất từ nhánh deploy
             git fetch origin deploy
