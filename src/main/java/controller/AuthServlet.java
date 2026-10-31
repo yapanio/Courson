@@ -2,6 +2,7 @@ package controller;
 
 import dao.SettingDao;
 import dao.UserDao;
+import dto.GoogleAuthResult;
 import dto.LoginDto;
 import dto.RegisterDto;
 import dto.UserDto;
@@ -145,6 +146,15 @@ public class AuthServlet extends HttpServlet {
         }
     }
 
+    private String getDynamicBaseUrl(HttpServletRequest req) {
+        String scheme = req.getScheme();
+        String serverName = req.getServerName();
+        int serverPort = req.getServerPort();
+        String contextPath = req.getContextPath();
+        return scheme + "://" + serverName
+                + ((serverPort == 80 || serverPort == 443) ? "" : (":" + serverPort)) + contextPath;
+    }
+
     private void register(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String username = req.getParameter("username");
         String email = req.getParameter("email");
@@ -155,12 +165,7 @@ public class AuthServlet extends HttpServlet {
 
         RegisterDto dto = new RegisterDto(username, email, password, confirmPassword, fullName, agreeTerms);
         try {
-            String scheme = req.getScheme();
-            String serverName = req.getServerName();
-            int serverPort = req.getServerPort();
-            String contextPath = req.getContextPath();
-            String dynamicBaseUrl = scheme + "://" + serverName
-                    + ((serverPort == 80 || serverPort == 443) ? "" : (":" + serverPort)) + contextPath;
+            String dynamicBaseUrl = getDynamicBaseUrl(req);
 
             authService.register(dto, dynamicBaseUrl);
             String encodedEmail = URLEncoder.encode(dto.getEmail().trim(), StandardCharsets.UTF_8);
@@ -264,8 +269,25 @@ public class AuthServlet extends HttpServlet {
             }
 
             // ── Bước 2c: Đăng nhập hoặc tạo tài khoản ──
-            UserDto user = authService.authenticateGoogle(googleUser.getEmail(), googleUser.getName());
+            String dynamicBaseUrl = getDynamicBaseUrl(req);
+            GoogleAuthResult result = authService.authenticateGoogle(googleUser.getEmail(), googleUser.getName(), dynamicBaseUrl);
+            UserDto user = result.getUser();
             SessionUtil.setCurrentUser(req, user);
+
+            if (session == null) session = req.getSession(true);
+            if (result.getStatus() == GoogleAuthResult.Status.NEW_USER_CREATED) {
+                session.setAttribute("flashToastType", "success");
+                session.setAttribute("flashToastMessage",
+                    "Đăng nhập Google thành công! Thông tin tài khoản và mật khẩu đã được gửi về Gmail của bạn.");
+            } else if (result.getStatus() == GoogleAuthResult.Status.UNVERIFIED_ACTIVATED) {
+                session.setAttribute("flashToastType", "success");
+                session.setAttribute("flashToastMessage",
+                    "Đăng nhập Google thành công! Tài khoản của bạn đã được kích hoạt. Tên đăng nhập và mật khẩu được giữ nguyên như khi đăng ký.");
+            } else {
+                session.setAttribute("flashToastType", "success");
+                session.setAttribute("flashToastMessage", "Đăng nhập bằng Google thành công! Chào mừng bạn quay trở lại.");
+            }
+
             redirectByRole(user, req, resp);
 
         } catch (Exception e) {
