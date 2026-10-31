@@ -20,12 +20,13 @@ Báo cáo này tổng hợp kết quả kiểm toán kỹ thuật (Technical Aud
 | **AUDIT-05** | Thiếu xác thực Module - Course & Trùng thứ tự bài học | **Trung bình (Medium):** Lỗi `uq_lessons_module_order` khi nhập trùng `order_index`; nguy cơ gán nhầm module của khóa học khác. | Xác thực `module.getCourseId() == dto.getCourseId()`; gọi `lessonDao.existsOrderIndex` kiểm tra trùng thứ tự trước khi thực thi lệnh ghi và đưa ra thông báo thân thiện. | **ĐÃ KHẮC PHỤC** |
 | **AUDIT-06** | Mất dữ liệu soạn thảo bản nháp khi submit bị lỗi | **Thấp - Trải nghiệm (Low/UX):** Khi người dùng nhấn "Lưu bài học", `localStorage` bị xóa ngay lập tức trước khi server phản hồi; nếu validate thất bại sẽ mất trắng bài soạn. | Giữ nguyên bản nháp local khi submit form; chỉ xóa bản nháp sau khi server xác nhận lưu thành công (qua cờ `savedSuccess=true` hoặc flash success). | **ĐÃ KHẮC PHỤC** |
 | **AUDIT-07** | Lịch hẹn lưu trữ khóa học không tự động kích hoạt | **Trung bình (Medium):** Khi tới hạn `archive_at`, nếu không có người truy cập thì trạng thái khóa học vẫn giữ `PUBLISHED`. | Cài đặt `CourseArchiveSchedulerListener` (Worker nền chạy định kỳ mỗi 60 giây) tự động quét và kích hoạt `archiveExpiredCourses` khi Tomcat chạy. | **ĐÃ KHẮC PHỤC** |
+| **AUDIT-08** | Trang User Profile dùng chung & Bảo mật dữ liệu người dùng | **Nghiêm trọng (High):** Nguy cơ đổi trái phép email tài khoản (dẫn đến chiếm quyền sở hữu); upload file giả mạo đuôi ảnh độc hại (RCE); mất đồng bộ session khi đổi username; lỗi thiếu cột CSDL `avatar_url`, `phone`, `birth_date`. | Thiết kế kiến trúc Profile an toàn: Chặn 100% việc đổi email (403 Forbidden); thẩm định magic bytes nhị phân cho ảnh PNG/JPEG/WEBP; lưu ảnh ngoài thư mục deploy Tomcat và tự động xóa ảnh cũ; chuẩn hóa SĐT Việt Nam (+84 sang 0); đồng bộ ngay `CURRENT_USER` trong session khi đổi username; áp dụng thống nhất cho 4 role (Student, Expert, Manager, Admin). | **ĐÃ KHẮC PHỤC** |
 
 ---
 
 ## 🧪 3. Danh mục Kiểm thử Hồi quy (Regression Test Checklist)
 
-### Bảng Kịch Bản Kiểm Thử (10 Test Cases Toàn Diện)
+### Bảng Kịch Bản Kiểm Thử (18 Test Cases Toàn Diện)
 
 | Mã TC | Phân quyền | Kịch bản kiểm thử | Các bước thực hiện | Kết quả mong đợi | Kết quả kiểm thử | Đánh giá |
 | :---: | :---: | :--- | :--- | :--- | :--- | :---: |
@@ -39,6 +40,14 @@ Báo cáo này tổng hợp kết quả kiểm toán kỹ thuật (Technical Aud
 | **TC-08** | `EXPERT` | Xóa bản nháp Local sau khi lưu thành công | 1. Nhập thông tin bài học hợp lệ.<br>2. Nhấn "Lưu bài học". | Server lưu thành công và chuyển hướng với `savedSuccess=true`. Bản nháp trong `localStorage` được dọn dẹp sạch sẽ. | Bản nháp dọn dẹp sạch sau khi lưu thành công. | **PASS** |
 | **TC-09** | `EXPERT` | Ẩn mềm bài học (Soft-Hide) & Khôi phục | 1. Bấm nút Tạm ẩn bài học trong đề cương.<br>2. Xác nhận qua Modal POST.<br>3. Bấm Mở lại bài học. | Cờ `is_active` chuyển thành `false` (bài học không bị xóa khỏi DB, dữ liệu tiến độ học viên giữ nguyên). Khi mở lại, `is_active` thành `true`. | Bài học ẩn/hiện chính xác, không mất dữ liệu liên quan. | **PASS** |
 | **TC-10** | `SYSTEM` | Kiểm tra Worker tự động lưu trữ khóa học tới hạn | 1. Thiết lập khóa học PUBLISHED có `archive_at = NOW() - 1 phút`.<br>2. Chờ Worker nền kích hoạt (chu kỳ 60s). | Worker `CourseArchiveSchedulerListener` tự động quét CSDL và cập nhật trạng thái khóa học sang `ARCHIVED`. | Khóa học chuyển sang ARCHIVED tự động. | **PASS** |
+| **TC-11** | `GUEST` | Kiểm tra phân quyền truy cập trang `/profile` | 1. Chưa đăng nhập.<br>2. Truy cập trực tiếp URL `/Courson/profile`. | `AuthenticationFilter` chặn truy cập, chuyển hướng 302 về trang đăng nhập `/Courson/auth/login`. | Chuyển hướng 302 về login chính xác. | **PASS** |
+| **TC-12** | `ALL_ROLES` | Tải lên ảnh đại diện & Thẩm định Magic Bytes | 1. Tải file giả mạo đuôi .png (nội dung text).<br>2. Tải file ảnh .png thật.<br>3. Tải tiếp ảnh khác để kiểm tra dọn ảnh cũ. | File giả bị từ chối với lỗi magic bytes. File ảnh thật được lưu tên UUID ngoài thư mục WAR, URL trả về dạng `/uploads/avatar/...`, ảnh cũ bị xóa khỏi đĩa. | Bảo mật upload tuyệt đối, dọn dẹp đĩa sạch sẽ. | **PASS** |
+| **TC-13** | `ALL_ROLES` | Cập nhật Họ và tên qua AJAX | 1. Nhập họ tên < 3 ký tự hoặc để trống.<br>2. Nhập họ tên hợp lệ (3-50 ký tự). | Server trả JSON báo lỗi validation chính xác. Khi hợp lệ, DB cập nhật và sidebar cập nhật tên mới không reload trang. | Validation khớp 100% luồng đăng ký. | **PASS** |
+| **TC-14** | `ALL_ROLES` | Cập nhật Số điện thoại chuẩn Việt Nam | 1. Nhập SĐT đầu số sai (0123...).<br>2. Nhập SĐT hợp lệ dạng `+84912345678`.<br>3. Để trống SĐT. | Đầu số sai bị từ chối. SĐT `+84` tự động chuẩn hóa về `0912345678`. Cho phép để trống (tùy chọn). | Chuẩn hóa SĐT VN hoạt động chuẩn xác. | **PASS** |
+| **TC-15** | `ALL_ROLES` | Đổi Tên đăng nhập & Đồng bộ Session | 1. Nhập username trùng (`admin`).<br>2. Nhập username sai định dạng.<br>3. Nhập username mới hợp lệ. | Bắt trùng và báo lỗi validation. Khi đổi thành công, session `CURRENT_USER` được cập nhật tức thì, không gây lỗi các trang khác. | Đổi username an toàn, đồng bộ session mượt mà. | **PASS** |
+| **TC-16** | `ALL_ROLES` | Chống can thiệp sửa Email tài khoản | 1. Kiểm tra UI: input email có thuộc tính `readonly disabled`.<br>2. Gửi request POST giả mạo `field=email&value=hacker@evil.com`. | Server chặn đứng với mã HTTP 403 Forbidden và thông báo "Email là định danh cố định, không được phép thay đổi". | Miễn nhiễm 100% với việc can thiệp sửa email. | **PASS** |
+| **TC-17** | `ALL_ROLES` | Cập nhật Ngày sinh & Thẩm định độ tuổi | 1. Chọn ngày sinh ở tương lai.<br>2. Chọn ngày sinh có tuổi < 10.<br>3. Chọn ngày sinh hợp lệ (ví dụ năm 2000). | Ngày tương lai và tuổi < 10 bị từ chối với lỗi rõ ràng. Ngày hợp lệ lưu thành công vào CSDL kiểu `date`. | Validation ngày sinh chặt chẽ. | **PASS** |
+| **TC-18** | `ALL_ROLES` | Hiển thị Badge vai trò & Avatar trên Navbar | 1. Đăng nhập lần lượt với 4 vai trò: `STUDENT`, `ADMIN`, `EXPERT`, `MANAGER`.<br>2. Quan sát badge tại sidebar và avatar tại navbar. | Hiển thị đúng nhãn/badge vai trò của từng user (`STUDENT`, `ADMIN`, `EXPERT`, `MANAGER`). Navbar hiển thị ảnh avatar đã upload (hoặc chữ cái đầu nếu chưa có ảnh). | Giao diện nhất quán, phân quyền trực quan. | **PASS** |
 
 ---
 
@@ -46,13 +55,15 @@ Báo cáo này tổng hợp kết quả kiểm toán kỹ thuật (Technical Aud
 
 ### 1. Kiểm tra cấu trúc CSDL và Migration:
 ```bash
-# Thực thi migration trên PostgreSQL:
+# Thực thi các migration lần lượt trên PostgreSQL:
 psql -U postgres -d courson_db -f database/migrations/01_add_pending_review_to_courses.sql
+psql -U postgres -d courson_db -f database/migrations/02_add_archive_and_notes_columns.sql
+psql -U postgres -d courson_db -f database/migrations/03_add_user_profile_columns.sql
 ```
 
 ### 2. Biên dịch và Đóng gói:
 ```bash
-mvn clean package -DskipTests
+mvn package -DskipTests
 ```
 
 ### 3. Khởi động Tomcat & Giám sát Worker nền:
@@ -62,4 +73,4 @@ Trong log của Tomcat (`catalina.out` hoặc console), quan sát thông báo kh
 ```
 
 ---
-*Báo cáo được hoàn thành và cập nhật tự động vào hệ thống ngày 24/10/2026.*
+*Báo cáo được hoàn thành và cập nhật tự động vào hệ thống ngày 31/10/2026.*
