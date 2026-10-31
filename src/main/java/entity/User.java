@@ -3,6 +3,7 @@ package entity;
 import entity.enums.AuthProvider;
 import entity.enums.SettingType;
 import entity.enums.UserStatus;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 public class User {
@@ -17,6 +18,9 @@ public class User {
     private UserStatus status;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
+    private String avatarUrl;
+    private String phone;
+    private LocalDate birthDate;
 
     public User() {
     }
@@ -123,5 +127,29 @@ public class User {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public LocalDate getBirthDate() {
+        return birthDate;
+    }
+
+    public void setBirthDate(LocalDate birthDate) {
+        this.birthDate = birthDate;
     }
 }

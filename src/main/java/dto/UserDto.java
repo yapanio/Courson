@@ -2,6 +2,7 @@ package dto;
 
 import entity.enums.AuthProvider;
 import entity.enums.UserStatus;
+import java.time.LocalDate;
 
 public class UserDto {
     private Long id;
@@ -12,6 +13,9 @@ public class UserDto {
     private String roleName;
     private AuthProvider authProvider;
     private UserStatus status;
+    private String avatarUrl;
+    private String phone;
+    private LocalDate birthDate;
 
     public UserDto() {
     }
@@ -90,5 +94,29 @@ public class UserDto {
 
     public void setStatus(UserStatus status) {
         this.status = status;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public LocalDate getBirthDate() {
+        return birthDate;
+    }
+
+    public void setBirthDate(LocalDate birthDate) {
+        this.birthDate = birthDate;
     }
 }
