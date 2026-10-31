@@ -593,8 +593,10 @@ CLOUDFLARE MODERN STREAMLINED NAVBAR
                                             <c:choose>
                                                 <c:when test="${not empty sessionScope.CURRENT_USER.avatarUrl}">
                                                     <img src="${pageContext.request.contextPath}${sessionScope.CURRENT_USER.avatarUrl}" class="cf-avatar navbar-avatar-img" style="object-fit: cover;" alt="Avatar" />
+                                                    <div class="cf-avatar navbar-avatar-text" style="display: none;">${userInitial}</div>
                                                 </c:when>
                                                 <c:otherwise>
+                                                    <img src="" class="cf-avatar navbar-avatar-img" style="object-fit: cover; display: none;" alt="Avatar" />
                                                     <div class="cf-avatar navbar-avatar-text">${userInitial}</div>
                                                 </c:otherwise>
                                             </c:choose>
@@ -604,10 +606,26 @@ CLOUDFLARE MODERN STREAMLINED NAVBAR
                                             <!-- User Summary -->
                                             <div class="cf-account-header">
                                                 <div class="d-flex align-items-center gap-2 mb-1">
-                                                    <div class="cf-avatar"
-                                                        style="width: 34px; height: 34px; font-size: 14px;">
-                                                        ${userInitial}
-                                                    </div>
+                                                    <c:choose>
+                                                        <c:when test="${not empty sessionScope.CURRENT_USER.avatarUrl}">
+                                                            <img src="${pageContext.request.contextPath}${sessionScope.CURRENT_USER.avatarUrl}"
+                                                                class="cf-avatar navbar-avatar-img"
+                                                                style="width: 34px; height: 34px; object-fit: cover;" alt="Avatar" />
+                                                            <div class="cf-avatar navbar-avatar-text"
+                                                                style="width: 34px; height: 34px; font-size: 14px; display: none;">
+                                                                ${userInitial}
+                                                            </div>
+                                                        </c:when>
+                                                        <c:otherwise>
+                                                            <img src=""
+                                                                class="cf-avatar navbar-avatar-img"
+                                                                style="width: 34px; height: 34px; object-fit: cover; display: none;" alt="Avatar" />
+                                                            <div class="cf-avatar navbar-avatar-text"
+                                                                style="width: 34px; height: 34px; font-size: 14px;">
+                                                                ${userInitial}
+                                                            </div>
+                                                        </c:otherwise>
+                                                    </c:choose>
                                                     <div class="overflow-hidden">
                                                         <div class="fw-bold text-dark text-truncate">${displayName}
                                                         </div>
@@ -805,8 +823,10 @@ CLOUDFLARE MODERN STREAMLINED NAVBAR
                                     <c:choose>
                                         <c:when test="${not empty sessionScope.CURRENT_USER.avatarUrl}">
                                             <img src="${pageContext.request.contextPath}${sessionScope.CURRENT_USER.avatarUrl}" class="cf-avatar navbar-avatar-img" style="object-fit: cover;" alt="Avatar" />
+                                            <div class="cf-avatar navbar-avatar-text" style="display: none;">${userInitial}</div>
                                         </c:when>
                                         <c:otherwise>
+                                            <img src="" class="cf-avatar navbar-avatar-img" style="object-fit: cover; display: none;" alt="Avatar" />
                                             <div class="cf-avatar navbar-avatar-text">${userInitial}</div>
                                         </c:otherwise>
                                     </c:choose>

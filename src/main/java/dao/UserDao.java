@@ -14,10 +14,10 @@ import java.util.List;
 import java.util.Optional;
 
 public class UserDao {
-    private static final String SQL_FIND_ALL = "SELECT id, username, email, password_hash, full_name, role_id, role_type, auth_provider, status, created_at, updated_at FROM users ORDER BY id DESC";
-    private static final String SQL_FIND_BY_ID = "SELECT id, username, email, password_hash, full_name, role_id, role_type, auth_provider, status, created_at, updated_at FROM users WHERE id = ?";
-    private static final String SQL_FIND_BY_EMAIL = "SELECT id, username, email, password_hash, full_name, role_id, role_type, auth_provider, status, created_at, updated_at FROM users WHERE LOWER(email) = LOWER(?)";
-    private static final String SQL_FIND_BY_USERNAME_OR_EMAIL = "SELECT id, username, email, password_hash, full_name, role_id, role_type, auth_provider, status, created_at, updated_at FROM users WHERE username = ? OR LOWER(email) = LOWER(?)";
+    private static final String SQL_FIND_ALL = "SELECT id, username, email, password_hash, full_name, role_id, role_type, auth_provider, status, created_at, updated_at, avatar_url, phone, birth_date FROM users ORDER BY id DESC";
+    private static final String SQL_FIND_BY_ID = "SELECT id, username, email, password_hash, full_name, role_id, role_type, auth_provider, status, created_at, updated_at, avatar_url, phone, birth_date FROM users WHERE id = ?";
+    private static final String SQL_FIND_BY_EMAIL = "SELECT id, username, email, password_hash, full_name, role_id, role_type, auth_provider, status, created_at, updated_at, avatar_url, phone, birth_date FROM users WHERE LOWER(email) = LOWER(?)";
+    private static final String SQL_FIND_BY_USERNAME_OR_EMAIL = "SELECT id, username, email, password_hash, full_name, role_id, role_type, auth_provider, status, created_at, updated_at, avatar_url, phone, birth_date FROM users WHERE username = ? OR LOWER(email) = LOWER(?)";
     private static final String SQL_EXISTS_USERNAME = "SELECT COUNT(1) FROM users WHERE username = ? AND (? IS NULL OR id != ?)";
     private static final String SQL_EXISTS_EMAIL = "SELECT COUNT(1) FROM users WHERE LOWER(email) = LOWER(?) AND (? IS NULL OR id != ?)";
     private static final String SQL_INSERT = "INSERT INTO users (username, email, password_hash, full_name, role_id, role_type, auth_provider, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id";
@@ -49,7 +49,7 @@ public class UserDao {
 
     public List<User> findByRoleId(Connection con, long roleId) throws SQLException {
         List<User> list = new ArrayList<>();
-        String sql = "SELECT id, username, email, password_hash, full_name, role_id, role_type, auth_provider, status, created_at, updated_at FROM users WHERE role_id = ? ORDER BY full_name ASC";
+        String sql = "SELECT id, username, email, password_hash, full_name, role_id, role_type, auth_provider, status, created_at, updated_at, avatar_url, phone, birth_date FROM users WHERE role_id = ? ORDER BY full_name ASC";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setLong(1, roleId);
             try (ResultSet rs = ps.executeQuery()) {
@@ -236,6 +236,10 @@ public class UserDao {
         u.setStatus(UserStatus.fromDb(rs.getString("status")));
         u.setCreatedAt(rs.getObject("created_at", OffsetDateTime.class));
         u.setUpdatedAt(rs.getObject("updated_at", OffsetDateTime.class));
+        u.setAvatarUrl(rs.getString("avatar_url"));
+        u.setPhone(rs.getString("phone"));
+        java.sql.Date bd = rs.getDate("birth_date");
+        u.setBirthDate(bd != null ? bd.toLocalDate() : null);
         return u;
     }
 }

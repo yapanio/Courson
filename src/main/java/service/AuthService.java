@@ -334,6 +334,9 @@ public class AuthService {
         dto.setRoleId(user.getRoleId());
         dto.setAuthProvider(user.getAuthProvider());
         dto.setStatus(user.getStatus());
+        dto.setAvatarUrl(user.getAvatarUrl());
+        dto.setPhone(user.getPhone());
+        dto.setBirthDate(user.getBirthDate());
 
         if (user.getRoleId() != null) {
             try (Connection con = DbConnection.getConnection()) {
