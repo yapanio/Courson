@@ -86,7 +86,7 @@ public class UserServlet extends HttpServlet {
             UserDto profile = userService.getUser(currentUser.getId());
             req.setAttribute("user", profile);
         }
-        req.getRequestDispatcher("/WEB-INF/views/user/profile.jsp").forward(req, resp);
+        resp.sendRedirect(req.getContextPath() + "/profile");
     }
 
     private void saveUser(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -112,9 +112,9 @@ public class UserServlet extends HttpServlet {
             userService.updateProfile(dto);
             currentUser.setFullName(dto.getFullName());
             SessionUtil.setCurrentUser(req, currentUser);
-            resp.sendRedirect(req.getContextPath() + "/users/profile?success=true");
+            resp.sendRedirect(req.getContextPath() + "/profile?success=true");
         } catch (Exception e) {
-            resp.sendRedirect(req.getContextPath() + "/users/profile?error=" + e.getMessage());
+            resp.sendRedirect(req.getContextPath() + "/profile?error=" + e.getMessage());
         }
     }
 
