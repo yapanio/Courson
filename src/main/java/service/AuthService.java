@@ -2,6 +2,7 @@ package service;
 
 import dao.SettingDao;
 import dao.UserDao;
+import dto.GoogleAuthResult;
 import dto.LoginDto;
 import dto.RegisterDto;
 import dto.UserDto;
@@ -16,6 +17,7 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import util.DbConnection;
+import util.MailUtil;
 import util.PasswordUtil;
 import util.ValidationUtil;
 
@@ -106,7 +108,7 @@ public class AuthService {
         }
     }
 
-    public UserDto authenticateGoogle(String email, String name) {
+    public GoogleAuthResult authenticateGoogle(String email, String name, String dynamicBaseUrl) {
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException("Email Google không hợp lệ.");
         }
@@ -119,6 +121,8 @@ public class AuthService {
                 // ── 1. Tìm theo email chính xác ──────────────────────────────
                 Optional<User> userOpt = userDao.findByEmail(con, email.trim());
                 User user;
+                GoogleAuthResult.Status authStatus;
+                String generatedPassword = null;
 
                 if (userOpt.isPresent()) {
                     // ── 2a. Đã có tài khoản với email này ────────────────────
@@ -130,10 +134,15 @@ public class AuthService {
                     }
 
                     // Nếu tài khoản LOCAL nhưng chưa verify (INACTIVE), Google đăng nhập
-                    // sẽ tự động verify luôn (email đã xác thực qua Google)
+                    // sẽ tự động kích hoạt luôn (email đã xác thực qua Google)
                     if (user.getStatus() == UserStatus.INACTIVE) {
                         userDao.updateStatus(con, user.getId(), UserStatus.ACTIVE);
                         user.setStatus(UserStatus.ACTIVE);
+                        // Vô hiệu hóa các token xác thực email chưa sử dụng trước đó nếu có
+                        new dao.VerificationTokenDao().invalidateTokensByUserId(con, user.getId());
+                        authStatus = GoogleAuthResult.Status.UNVERIFIED_ACTIVATED;
+                    } else {
+                        authStatus = GoogleAuthResult.Status.EXISTING_USER;
                     }
 
                     // Nếu trước đây đăng ký LOCAL, cập nhật auth_provider → GOOGLE
@@ -146,14 +155,17 @@ public class AuthService {
                     // ── 2b. Chưa có tài khoản → tạo mới ─────────────────────
                     Setting studentRole = resolveStudentRole();
 
-                    // Tạo username từ phần trước @ của email
+                    // Tạo username từ phần trước @ của email (giữ nguyên logic chuẩn)
                     String baseUsername = sanitizeUsername(email.split("@")[0]);
                     String username = resolveUniqueUsername(con, baseUsername);
+
+                    // Tạo mật khẩu ngẫu nhiên bằng SecureRandom thỏa mãn chuẩn validate đăng ký
+                    generatedPassword = PasswordUtil.generateSecureRandomPassword();
 
                     user = new User();
                     user.setUsername(username);
                     user.setEmail(email.trim());
-                    user.setPasswordHash(null); // Google user không có password
+                    user.setPasswordHash(PasswordUtil.hash(generatedPassword));
                     user.setFullName(name != null && !name.trim().isEmpty()
                         ? name.trim()
                         : baseUsername);
@@ -163,10 +175,24 @@ public class AuthService {
                     user.setStatus(UserStatus.ACTIVE); // Google đã verify email rồi
                     long id = userDao.insert(con, user);
                     user.setId(id);
+
+                    authStatus = GoogleAuthResult.Status.NEW_USER_CREATED;
                 }
 
                 con.commit();
-                return mapUser(user);
+
+                // Gửi email thật chứa thông tin tài khoản và mật khẩu sau khi commit thành công
+                if (authStatus == GoogleAuthResult.Status.NEW_USER_CREATED && generatedPassword != null) {
+                    MailUtil.sendAccountCredentialsEmailAsync(
+                        user.getEmail(),
+                        user.getFullName(),
+                        user.getUsername(),
+                        generatedPassword,
+                        dynamicBaseUrl
+                    );
+                }
+
+                return new GoogleAuthResult(mapUser(user), authStatus);
             } catch (Exception ex) {
                 DbConnection.rollbackQuietly(con);
                 throw ex;
@@ -176,6 +202,10 @@ public class AuthService {
         } catch (SQLException e) {
             throw new RuntimeException("Lỗi đăng nhập Google: " + e.getMessage(), e);
         }
+    }
+
+    public UserDto authenticateGoogle(String email, String name) {
+        return authenticateGoogle(email, name, null).getUser();
     }
 
     public void logout(HttpSession session) {
@@ -304,6 +334,9 @@ public class AuthService {
         dto.setRoleId(user.getRoleId());
         dto.setAuthProvider(user.getAuthProvider());
         dto.setStatus(user.getStatus());
+        dto.setAvatarUrl(user.getAvatarUrl());
+        dto.setPhone(user.getPhone());
+        dto.setBirthDate(user.getBirthDate());
 
         if (user.getRoleId() != null) {
             try (Connection con = DbConnection.getConnection()) {

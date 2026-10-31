@@ -107,11 +107,7 @@
                                     <input type="text" name="newModuleTitle" id="newModuleTitle" class="form-control"
                                            placeholder="Nhập tên chương học mới..."
                                            value="${empty course.modules ? 'Chương 1: Khởi động & Giới thiệu' : ''}">
-                                    <button type="button" class="btn btn-outline-secondary" onclick="fetchAiModuleSuggestion()" title="AI gợi ý tên chương dựa theo bài học">
-                                        <i class="bi bi-stars text-warning me-1"></i>AI gợi ý tên chương
-                                    </button>
                                 </div>
-                                <div id="aiModuleFeedback" class="small mt-1 text-muted d-none"></div>
                             </div>
                         </div>
 
@@ -835,41 +831,7 @@
         }
     }
 
-    function fetchAiModuleSuggestion() {
-        const lessonTitle = document.getElementById('lessonTitle') ? document.getElementById('lessonTitle').value : '';
-        const courseId = document.getElementById('lessonCourseId') ? document.getElementById('lessonCourseId').value : '';
-        const fb = document.getElementById('aiModuleFeedback');
-        if (fb) {
-            fb.className = 'small mt-1 text-muted';
-            fb.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>AI đang phân tích bài học để gợi ý tên chương...';
-            fb.classList.remove('d-none');
-        }
-        const params = new URLSearchParams();
-        params.append('courseId', courseId);
-        params.append('lessonTitle', lessonTitle);
-        fetch('${pageContext.request.contextPath}/expert/suggest-module-title', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString()
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data && data.moduleTitle) {
-                const inp = document.getElementById('newModuleTitle');
-                if (inp) inp.value = data.moduleTitle;
-                if (fb) {
-                    fb.className = 'small mt-1 text-success';
-                    fb.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Đã gợi ý: <strong>' + data.moduleTitle + '</strong>';
-                }
-            } else if (fb) {
-                fb.className = 'small mt-1 text-muted';
-                fb.textContent = 'Chưa có gợi ý phù hợp.';
-            }
-        })
-        .catch(() => {
-            if (fb) fb.classList.add('d-none');
-        });
-    }
+
 </script>
 
 <jsp:include page="../common/footer.jsp" />

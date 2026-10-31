@@ -34,12 +34,11 @@ Hệ thống cung cấp chu trình đào tạo hoàn chỉnh theo mô hình **RB
 2. **Cơ chế Ẩn mềm Bài giảng & Bảo vệ Phiên học viên (Soft-Hide & Student Session Protection):**
    * **Loại bỏ nút Xóa vĩnh viễn (No Hard Deletes):** Bài học không bị xóa (`DELETE CASCADE`) khỏi database để bảo vệ an toàn 100% dữ liệu lịch sử học tập (`lesson_progress`) và ghi chú của học viên. Thay vào đó, Giảng viên sử dụng chức năng **Ẩn/Hiện mềm** (`is_active = false/true`).
    * **Bảo vệ phiên học viên (Active Session Grace):** Nếu Giảng viên ẩn bài học khi học viên đang trực tiếp học bài đó, học viên vẫn được phép hoàn tất việc xem video và lưu ghi chú trong phiên làm việc hiện tại. Chỉ khi học viên chuyển sang bài khác hoặc rời khỏi phiên, bài ẩn mới chính thức biến mất; các yêu cầu truy cập trực tiếp bài ẩn sau đó sẽ tự động được hệ thống chuyển hướng an toàn về bài học khả dụng đầu tiên của khóa.
-3. **Trợ lý Sáng tạo Nội dung Google Gemini AI:**
+3. **Trợ lý Sáng tạo Nội dung Google Gemini AI (Tổng quan Khóa học):**
    * Tích hợp Google Gemini AI (1.5 Flash / 2.0 Flash) qua REST API.
-   * Gợi ý tiêu đề chương học thông minh (`suggestModuleTitle`).
-   * Tự động quét lấy tiêu đề & thời lượng video YouTube (`fetch-youtube-title`).
    * Tự động tạo mô tả và đề cương khóa học bằng AI (`generate-ai-description`).
-   * Nhập hàng loạt bài giảng từ danh sách phát YouTube (`batch-save-lessons`).
+   * Tự động quét lấy tiêu đề & thời lượng video YouTube (`get-video-title`).
+   * Nhập hàng loạt bài giảng từ danh sách phát YouTube (`preview-batch-videos` & `batch-save-lessons`).
 4. **Tự động Lưu Bản nháp & Khôi phục Sự cố (Real-time Auto-save Drafts):**
    * Tích hợp trình soạn thảo WYSIWYG **Quill.js** hiện đại.
    * Cơ chế debounced 2.5 giây tự động lưu nháp nội dung bài học vào server/session.
@@ -204,10 +203,9 @@ flowchart TD
   * **Ẩn / Hiện mềm Bài giảng (Soft-Hide / Unhide - `/expert/toggle-lesson-status`):**
     * Loại bỏ hoàn toàn nút xóa cứng (`DELETE`), thay thế bằng nút chuyển đổi trạng thái Hoạt động / Tạm ẩn (`is_active = true/false`).
     * Giữ nguyên 100% dữ liệu tiến độ và bài nộp của học viên, tránh lỗi hổng toàn vẹn khóa ngoại.
-* **Trợ lý Sáng tạo Nội dung Google Gemini AI:**
-  * **Gợi ý Tiêu đề Chương học (`/expert/suggest-module-title`):** Nhập chủ đề hoặc từ khóa, AI tự động gợi ý danh sách tiêu đề module hấp dẫn, chuẩn sư phạm.
+* **Trợ lý Sáng tạo Nội dung Google Gemini AI (Tổng quan Khóa học):**
+  * **Tạo Mô tả Khóa học bằng AI (`/expert/generate-ai-description`):** AI phân tích tên khóa học và tạo ra bản mô tả cuốn hút kèm mục tiêu bài học chuẩn SEO ngay trên form tạo tổng quan khóa học.
   * **Tự động Lấy Tiêu đề & Thời lượng YouTube (`/expert/get-video-title`):** Giảng viên chỉ cần dán link YouTube, hệ thống tự động trích xuất tiêu đề chính xác và thời lượng của video.
-  * **Tạo Mô tả Khóa học bằng AI (`/expert/generate-ai-description`):** AI phân tích tên khóa học và tạo ra bản mô tả cuốn hút kèm mục tiêu bài học chuẩn SEO.
   * **Nhập Hàng loạt Bài giảng từ Playlist YouTube (`/expert/preview-batch-videos` & `/expert/batch-save-lessons`):** Quét toàn bộ playlist video và nhập hàng loạt vào module chỉ trong vài giây.
 * **Quy trình Kiểm duyệt & Khóa Soạn thảo Nghiêm ngặt (Review Lock):**
   * **Gửi Yêu cầu Xuất bản (`/expert/request-publish`):** Chuyển khóa học từ `DRAFT` sang `PENDING_REVIEW`.
@@ -366,7 +364,6 @@ Hệ thống được chuẩn hóa với **14 bảng quan hệ**, đảm bảo t
 | | `/expert/archive-course` | `POST` | EXPERT, ADMIN | Lưu trữ khóa học ngay hoặc lên lịch hẹn giờ đóng đăng ký |
 | | `/expert/unarchive-course` | `POST` | EXPERT, ADMIN | Khôi phục khóa học lưu trữ trở lại hoạt động |
 | | `/expert/cancel-archive` | `POST` | EXPERT, ADMIN | Hủy bỏ lịch hẹn lưu trữ khóa học đã thiết lập |
-| | `/expert/suggest-module-title` | `GET` | EXPERT, ADMIN | Gọi Google Gemini AI gợi ý tiêu đề chương học thông minh |
 | | `/expert/get-video-title` | `GET` | EXPERT, ADMIN | Tự động quét lấy tiêu đề & thời lượng video YouTube |
 | | `/expert/generate-ai-description` | `POST` | EXPERT, ADMIN | Dùng Gemini AI tạo mô tả và đề cương khóa học tự động |
 | | `/expert/batch-save-lessons` | `POST` | EXPERT, ADMIN | Nhập hàng loạt bài giảng vào module từ danh sách video YouTube |

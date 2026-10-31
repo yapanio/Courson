@@ -1,3 +1,4 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 
 <footer class="cf-footer mt-auto">
@@ -244,5 +245,195 @@
         };
     })(window);
 </script>
+
+<style>
+    /* Universal Courson Toast Styles */
+    .courson-toast-container {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        pointer-events: none;
+        max-width: 440px;
+        width: calc(100vw - 48px);
+    }
+    @media (max-width: 600px) {
+        .courson-toast-container {
+            top: 16px;
+            right: 16px;
+            left: 16px;
+            width: auto;
+        }
+    }
+    .courson-toast {
+        pointer-events: auto;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px 18px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.1);
+        font-size: 14px;
+        line-height: 1.5;
+        font-family: inherit;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        transform: translateX(110%);
+        opacity: 0;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .courson-toast.show {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    .courson-toast.hide {
+        transform: translateX(120%);
+        opacity: 0;
+    }
+    .courson-toast-success {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95));
+        color: #ffffff;
+        border-color: rgba(110, 231, 183, 0.4);
+    }
+    .courson-toast-error {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95));
+        color: #ffffff;
+        border-color: rgba(252, 165, 165, 0.4);
+    }
+    .courson-toast-info {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.95), rgba(37, 99, 235, 0.95));
+        color: #ffffff;
+        border-color: rgba(147, 197, 253, 0.4);
+    }
+    .courson-toast-warning {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.95), rgba(217, 119, 6, 0.95));
+        color: #ffffff;
+        border-color: rgba(253, 230, 138, 0.4);
+    }
+    .courson-toast-icon {
+        font-size: 20px;
+        line-height: 1;
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+    .courson-toast-content {
+        flex: 1;
+        font-weight: 500;
+    }
+    .courson-toast-close {
+        background: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0;
+        margin-left: 4px;
+        flex-shrink: 0;
+        transition: color 0.15s ease;
+    }
+    .courson-toast-close:hover {
+        color: #ffffff;
+    }
+</style>
+
+<script>
+    (function(global) {
+        'use strict';
+        if (!global.CoursonToast) {
+            let container = null;
+            function getOrCreateContainer() {
+                if (!container || !document.body.contains(container)) {
+                    container = document.createElement('div');
+                    container.className = 'courson-toast-container';
+                    container.setAttribute('aria-live', 'polite');
+                    container.setAttribute('aria-atomic', 'true');
+                    document.body.appendChild(container);
+                }
+                return container;
+            }
+            const ICONS = {
+                success: 'bi-check-circle-fill',
+                error: 'bi-exclamation-triangle-fill',
+                warning: 'bi-exclamation-circle-fill',
+                info: 'bi-info-circle-fill'
+            };
+            function dismissToast(toast) {
+                if (!toast || toast.classList.contains('hide')) return;
+                toast.classList.remove('show');
+                toast.classList.add('hide');
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 400);
+            }
+            const CoursonToast = {
+                show: function(type, message, duration = 6000) {
+                    if (!message) return;
+                    const c = getOrCreateContainer();
+                    const normalizedType = ['success', 'error', 'warning', 'info'].includes(type) ? type : 'info';
+                    const iconClass = ICONS[normalizedType];
+                    const toast = document.createElement('div');
+                    toast.className = 'courson-toast courson-toast-' + normalizedType;
+                    toast.setAttribute('role', 'status');
+                    const iconSpan = document.createElement('span');
+                    iconSpan.className = 'courson-toast-icon bi ' + iconClass;
+                    toast.appendChild(iconSpan);
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'courson-toast-content';
+                    contentDiv.textContent = message;
+                    toast.appendChild(contentDiv);
+                    const closeBtn = document.createElement('button');
+                    closeBtn.className = 'courson-toast-close';
+                    closeBtn.setAttribute('type', 'button');
+                    closeBtn.setAttribute('aria-label', 'Đóng thông báo');
+                    closeBtn.innerHTML = '&times;';
+                    closeBtn.onclick = function() {
+                        dismissToast(toast);
+                    };
+                    toast.appendChild(closeBtn);
+                    c.appendChild(toast);
+                    requestAnimationFrame(() => {
+                        toast.classList.add('show');
+                    });
+                    let timer = setTimeout(() => {
+                        dismissToast(toast);
+                    }, duration);
+                    toast.onmouseenter = () => {
+                        clearTimeout(timer);
+                    };
+                    toast.onmouseleave = () => {
+                        timer = setTimeout(() => {
+                            dismissToast(toast);
+                        }, 2000);
+                    };
+                    return toast;
+                }
+            };
+            global.CoursonToast = CoursonToast;
+        }
+    })(window);
+</script>
+
+<c:if test="${not empty sessionScope.flashToastMessage}">
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.CoursonToast) {
+                window.CoursonToast.show(
+                    '<c:out value="${sessionScope.flashToastType != null ? sessionScope.flashToastType : 'info'}"/>',
+                    '<c:out value="${sessionScope.flashToastMessage}"/>'
+                );
+            }
+        });
+    </script>
+    <c:remove var="flashToastMessage" scope="session"/>
+    <c:remove var="flashToastType" scope="session"/>
+</c:if>
+
 </body>
 </html>

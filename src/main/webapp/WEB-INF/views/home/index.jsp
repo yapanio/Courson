@@ -571,7 +571,7 @@
                 </c:when>
                 <c:otherwise>
                     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-                        <c:forEach var="c" items="${courses}">
+                        <c:forEach var="c" items="${courses}" begin="0" end="2">
                             <c:set var="targetCourseUrl" value="${pageContext.request.contextPath}/courses/detail?id=${c.id}" />
                             <c:set var="targetCourseCta" value="Xem khóa học" />
                             <c:set var="targetCourseIcon" value="bi-arrow-right" />

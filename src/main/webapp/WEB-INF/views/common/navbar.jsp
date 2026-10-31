@@ -590,17 +590,42 @@ CLOUDFLARE MODERN STREAMLINED NAVBAR
 
                                     <div class="cf-user-dropdown">
                                         <div class="cf-user-trigger">
-                                            <div class="cf-avatar">${userInitial}</div>
+                                            <c:choose>
+                                                <c:when test="${not empty sessionScope.CURRENT_USER.avatarUrl}">
+                                                    <img src="${pageContext.request.contextPath}${sessionScope.CURRENT_USER.avatarUrl}" class="cf-avatar navbar-avatar-img" style="object-fit: cover;" alt="Avatar" />
+                                                    <div class="cf-avatar navbar-avatar-text" style="display: none;">${userInitial}</div>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <img src="" class="cf-avatar navbar-avatar-img" style="object-fit: cover; display: none;" alt="Avatar" />
+                                                    <div class="cf-avatar navbar-avatar-text">${userInitial}</div>
+                                                </c:otherwise>
+                                            </c:choose>
                                         </div>
 
                                         <div class="cf-dropdown-menu cf-account-menu">
                                             <!-- User Summary -->
                                             <div class="cf-account-header">
                                                 <div class="d-flex align-items-center gap-2 mb-1">
-                                                    <div class="cf-avatar"
-                                                        style="width: 34px; height: 34px; font-size: 14px;">
-                                                        ${userInitial}
-                                                    </div>
+                                                    <c:choose>
+                                                        <c:when test="${not empty sessionScope.CURRENT_USER.avatarUrl}">
+                                                            <img src="${pageContext.request.contextPath}${sessionScope.CURRENT_USER.avatarUrl}"
+                                                                class="cf-avatar navbar-avatar-img"
+                                                                style="width: 34px; height: 34px; object-fit: cover;" alt="Avatar" />
+                                                            <div class="cf-avatar navbar-avatar-text"
+                                                                style="width: 34px; height: 34px; font-size: 14px; display: none;">
+                                                                ${userInitial}
+                                                            </div>
+                                                        </c:when>
+                                                        <c:otherwise>
+                                                            <img src=""
+                                                                class="cf-avatar navbar-avatar-img"
+                                                                style="width: 34px; height: 34px; object-fit: cover; display: none;" alt="Avatar" />
+                                                            <div class="cf-avatar navbar-avatar-text"
+                                                                style="width: 34px; height: 34px; font-size: 14px;">
+                                                                ${userInitial}
+                                                            </div>
+                                                        </c:otherwise>
+                                                    </c:choose>
                                                     <div class="overflow-hidden">
                                                         <div class="fw-bold text-dark text-truncate">${displayName}
                                                         </div>
@@ -639,7 +664,7 @@ CLOUDFLARE MODERN STREAMLINED NAVBAR
 
                                             <!-- User Links -->
                                             <a class="cf-dropdown-item"
-                                                href="${pageContext.request.contextPath}/users/profile">
+                                                href="${pageContext.request.contextPath}/profile">
                                                 <i class="bi bi-person-circle text-primary"></i> Hồ sơ cá nhân
                                             </a>
 
@@ -795,7 +820,16 @@ CLOUDFLARE MODERN STREAMLINED NAVBAR
                         <c:choose>
                             <c:when test="${sessionScope.CURRENT_USER != null}">
                                 <div class="d-flex align-items-center gap-2 mb-3">
-                                    <div class="cf-avatar">${userInitial}</div>
+                                    <c:choose>
+                                        <c:when test="${not empty sessionScope.CURRENT_USER.avatarUrl}">
+                                            <img src="${pageContext.request.contextPath}${sessionScope.CURRENT_USER.avatarUrl}" class="cf-avatar navbar-avatar-img" style="object-fit: cover;" alt="Avatar" />
+                                            <div class="cf-avatar navbar-avatar-text" style="display: none;">${userInitial}</div>
+                                        </c:when>
+                                        <c:otherwise>
+                                            <img src="" class="cf-avatar navbar-avatar-img" style="object-fit: cover; display: none;" alt="Avatar" />
+                                            <div class="cf-avatar navbar-avatar-text">${userInitial}</div>
+                                        </c:otherwise>
+                                    </c:choose>
                                     <div class="overflow-hidden">
                                         <div class="fw-bold text-dark text-truncate small">${displayName}</div>
                                         <span class="cf-role-badge cf-role-student py-0 px-2"
@@ -803,7 +837,7 @@ CLOUDFLARE MODERN STREAMLINED NAVBAR
                                     </div>
                                 </div>
                                 <div class="d-grid gap-2">
-                                    <a href="${pageContext.request.contextPath}/users/profile"
+                                    <a href="${pageContext.request.contextPath}/profile"
                                         class="btn btn-outline-secondary btn-sm">
                                         <i class="bi bi-person me-1"></i>Hồ sơ cá nhân
                                     </a>
