@@ -1196,7 +1196,7 @@ body {
 </main>
 
 <!-- New Course Modal (Redesigned Minimalist SaaS Modal) -->
-<div class="modal fade" id="newCourseModal" tabindex="-1" aria-labelledby="newCourseModalLabel" aria-hidden="true">
+<div class="modal fade" id="newCourseModal" tabindex="-1" aria-labelledby="newCourseModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content saas-modal">
             <form action="${pageContext.request.contextPath}/expert/save-course" method="POST">
@@ -1311,7 +1311,7 @@ body {
 </div>
 
 <!-- Single Reusable Edit Course Modal (Redesigned) -->
-<div class="modal fade" id="editCourseModal" tabindex="-1" aria-labelledby="editCourseModalTitle" aria-hidden="true">
+<div class="modal fade" id="editCourseModal" tabindex="-1" aria-labelledby="editCourseModalTitle" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content saas-modal">
             <form action="${pageContext.request.contextPath}/expert/save-course" method="POST">

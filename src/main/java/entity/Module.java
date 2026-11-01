@@ -44,6 +44,25 @@ public class Module {
         this.title = title;
     }
 
+    /**
+     * Tiêu đề sạch đã loại bỏ tiền tố trùng lặp 'Chương X:', 'Module X:' (nếu có).
+     */
+    public String getCleanTitle() {
+        if (title == null) return "";
+        return title.replaceFirst("^(?iu)(chương|chuong|module|phần|phan)\\s*\\d+\\s*[:.-]?\\s*", "").trim();
+    }
+
+    /**
+     * Chuỗi tiêu đề hiển thị chuẩn hóa duy nhất: 'Chương X: [Tên chương]'
+     */
+    public String getDisplayTitle() {
+        String clean = getCleanTitle();
+        if (clean.isEmpty()) {
+            return "Chương " + orderIndex;
+        }
+        return "Chương " + orderIndex + ": " + clean;
+    }
+
     public int getOrderIndex() {
         return orderIndex;
     }

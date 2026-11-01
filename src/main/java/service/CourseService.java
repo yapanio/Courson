@@ -34,6 +34,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import util.DbConnection;
 import util.GeminiAiUtil;
 import util.ValidationUtil;
@@ -44,6 +45,7 @@ public class CourseService {
     private final LessonDao lessonDao;
     private final LessonProgressDao lessonProgressDao;
     private final RegistrationDao registrationDao;
+    private final QuizDao quizDao = new QuizDao();
 
     public CourseService(CourseDao courseDao, ModuleDao moduleDao, LessonDao lessonDao,
             LessonProgressDao lessonProgressDao, RegistrationDao registrationDao) {
@@ -784,6 +786,14 @@ public class CourseService {
     public void deleteModule(long moduleId) {
         checkModuleEditable(moduleId);
         try (Connection con = DbConnection.getConnection()) {
+            List<Lesson> lessons = lessonDao.findByModuleId(con, moduleId);
+            if (lessons != null && !lessons.isEmpty()) {
+                throw new IllegalArgumentException("Không thể xóa chương học này vì vẫn còn " + lessons.size() + " bài học bên trong. Vui lòng di chuyển hoặc xóa các bài học trước khi xóa chương.");
+            }
+            List<Quiz> quizzes = quizDao.findByModuleId(con, moduleId);
+            if (quizzes != null && !quizzes.isEmpty()) {
+                throw new IllegalArgumentException("Không thể xóa chương học này vì vẫn còn " + quizzes.size() + " bài kiểm tra (Quiz) bên trong. Vui lòng di chuyển hoặc xóa bài kiểm tra trước khi xóa chương.");
+            }
             boolean deleted = moduleDao.delete(con, moduleId);
             if (!deleted) {
                 throw new IllegalArgumentException("Không tìm thấy chương cần xóa.");
@@ -886,7 +896,7 @@ public class CourseService {
                                 "Chương học ID " + dto.getModuleId() + " không tồn tại."));
 
                 if (dto.getCourseId() != null && dto.getCourseId() > 0) {
-                    if (targetModule.getCourseId() != dto.getCourseId()) {
+                    if (!Objects.equals(targetModule.getCourseId(), dto.getCourseId())) {
                         throw new IllegalArgumentException("Chương học ID " + dto.getModuleId() + " không thuộc về khóa học ID " + dto.getCourseId());
                     }
                 }
@@ -895,18 +905,65 @@ public class CourseService {
                 if (dto.getId() != null && dto.getId() > 0) {
                     Lesson existing = lessonDao.findById(con, dto.getId())
                             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học cần sửa."));
-                    if (existing.getModuleId() != dto.getModuleId()) {
+                    if (!Objects.equals(existing.getModuleId(), dto.getModuleId())) {
                         Module oldMod = moduleDao.findById(con, existing.getModuleId()).orElse(null);
-                        if (oldMod != null && oldMod.getCourseId() != targetModule.getCourseId()) {
+                        if (oldMod != null && !Objects.equals(oldMod.getCourseId(), targetModule.getCourseId())) {
                             throw new IllegalArgumentException("Không thể di chuyển bài học sang chương thuộc khóa học khác.");
                         }
+
+                        // Quy tắc đổi chương:
+                        // - Nếu bài học chuyển từ chương ở TRƯỚC (oldMod.orderIndex < targetModule.orderIndex): Đẩy lên ĐẦU chương đích (order_index = 1)
+                        // - Nếu bài học chuyển từ chương ở SAU (oldMod.orderIndex >= targetModule.orderIndex): Đẩy xuống CUỐI chương đích (order_index = max + 1)
+                        List<Lesson> targetLessons = lessonDao.findByModuleId(con, dto.getModuleId());
+                        List<Lesson> otherLessons = new ArrayList<>();
+                        for (Lesson tl : targetLessons) {
+                            if (!Objects.equals(tl.getId(), dto.getId())) {
+                                otherLessons.add(tl);
+                            }
+                        }
+
+                        if (oldMod != null && oldMod.getOrderIndex() < targetModule.getOrderIndex()) {
+                            // Đẩy lên đầu: bài học mới nhận orderIndex = 1, các bài hiện tại dời thành 2, 3, 4...
+                            // Dùng 2-phase update với thứ tự âm tạm thời để triệt tiêu hoàn toàn vi phạm unique constraint
+                            String tempSql = "UPDATE lessons SET order_index = - ? WHERE id = ?";
+                            try (PreparedStatement ps = con.prepareStatement(tempSql)) {
+                                for (int i = 0; i < otherLessons.size(); i++) {
+                                    ps.setInt(1, (i + 1) * 1000);
+                                    ps.setLong(2, otherLessons.get(i).getId());
+                                    ps.addBatch();
+                                }
+                                ps.executeBatch();
+                            }
+                            String shiftSql = "UPDATE lessons SET order_index = ? WHERE id = ?";
+                            try (PreparedStatement ps = con.prepareStatement(shiftSql)) {
+                                for (int i = 0; i < otherLessons.size(); i++) {
+                                    ps.setInt(1, i + 2); // 2, 3, 4, ...
+                                    ps.setLong(2, otherLessons.get(i).getId());
+                                    ps.addBatch();
+                                }
+                                ps.executeBatch();
+                            }
+                            dto.setOrderIndex(1);
+                        } else {
+                            // Đẩy xuống cuối chương đích
+                            int nextOrder = otherLessons.isEmpty() ? 1 :
+                                    (otherLessons.stream().mapToInt(Lesson::getOrderIndex).max().orElse(0) + 1);
+                            dto.setOrderIndex(nextOrder);
+                        }
                     }
+                } else {
+                    int maxOrder = lessonDao.findByModuleId(con, dto.getModuleId())
+                            .stream().mapToInt(Lesson::getOrderIndex).max().orElse(0);
+                    dto.setOrderIndex(maxOrder + 1);
                 }
 
-                // 3. Kiểm tra chống trùng thứ tự bài học (order_index) trong cùng một Module
+                // 3. Kiểm tra chống trùng thứ tự bài học (order_index) trong cùng một Module (Safety Fallback)
                 Long excludeLessonId = (dto.getId() != null && dto.getId() > 0) ? dto.getId() : null;
                 if (lessonDao.existsOrderIndex(con, dto.getModuleId(), dto.getOrderIndex(), excludeLessonId)) {
-                    throw new IllegalArgumentException("Thứ tự bài học (" + dto.getOrderIndex() + ") đã tồn tại trong chương này. Vui lòng chọn số thứ tự khác.");
+                    int maxOrder = lessonDao.findByModuleId(con, dto.getModuleId())
+                            .stream().filter(l -> !Objects.equals(l.getId(), excludeLessonId))
+                            .mapToInt(Lesson::getOrderIndex).max().orElse(0);
+                    dto.setOrderIndex(maxOrder + 1);
                 }
 
                 long id;
@@ -947,6 +1004,52 @@ public class CourseService {
     }
 
     /**
+     * Sắp xếp lại thứ tự bài học (Kéo thả Drag & Drop):
+     * - Hỗ trợ kéo thả trong cùng một chương hoặc kéo thả xuyên chương.
+     * - Cập nhật nguyên tử trong một Transaction dùng số âm tạm thời để triệt tiêu vi phạm unique constraint.
+     */
+    public void reorderLessons(long targetModuleId, List<Long> orderedLessonIds) {
+        if (orderedLessonIds == null || orderedLessonIds.isEmpty()) return;
+        checkModuleEditable(targetModuleId);
+        try (Connection con = DbConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try {
+                // 1. Gán thứ tự tạm thời âm để tránh đụng độ unique constraint (uq_lessons_module_order)
+                String tempSql = "UPDATE lessons SET order_index = - ? WHERE id = ?";
+                try (PreparedStatement ps = con.prepareStatement(tempSql)) {
+                    for (int i = 0; i < orderedLessonIds.size(); i++) {
+                        ps.setInt(1, (i + 1) * 1000);
+                        ps.setLong(2, orderedLessonIds.get(i));
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                }
+
+                // 2. Cập nhật module_id đích và thứ tự chính thức từ 1 đến N
+                String finalSql = "UPDATE lessons SET module_id = ?, order_index = ?, updated_at = now() WHERE id = ?";
+                try (PreparedStatement ps = con.prepareStatement(finalSql)) {
+                    for (int i = 0; i < orderedLessonIds.size(); i++) {
+                        ps.setLong(1, targetModuleId);
+                        ps.setInt(2, i + 1);
+                        ps.setLong(3, orderedLessonIds.get(i));
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                }
+
+                con.commit();
+            } catch (Exception ex) {
+                DbConnection.rollbackQuietly(con);
+                throw ex;
+            } finally {
+                con.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Lỗi cập nhật vị trí bài học: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Lấy ID của Manager khả dụng để phân công cho khóa học mới.
      */
     public Long getDefaultManagerId() {
@@ -968,7 +1071,28 @@ public class CourseService {
 
     @Deprecated
     public void deleteLesson(long lessonId) {
-        hideLesson(lessonId);
+        checkLessonEditable(lessonId);
+        try (Connection con = DbConnection.getConnection()) {
+            Lesson l = lessonDao.findById(con, lessonId)
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học cần xóa."));
+            Module m = moduleDao.findById(con, l.getModuleId())
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy chương học của bài này."));
+            Course c = courseDao.findById(con, m.getCourseId())
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy khóa học."));
+
+            boolean hasProgress = lessonProgressDao.hasProgress(con, lessonId);
+            if (hasProgress || c.getStatus() == CourseStatus.PUBLISHED) {
+                toggleLessonActive(lessonId, false);
+                throw new IllegalStateException("Bài học này thuộc khóa học đã xuất bản hoặc đã có tiến độ học tập của học viên. Hệ thống đã tự động chuyển bài học sang trạng thái [Đã ẩn] để bảo toàn dữ liệu thay vì xóa vĩnh viễn.");
+            }
+
+            boolean deleted = lessonDao.delete(con, lessonId);
+            if (!deleted) {
+                throw new IllegalArgumentException("Không thể xóa bài học.");
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Lỗi xóa bài học: " + e.getMessage(), e);
+        }
     }
 
     public void toggleLessonActive(long lessonId, boolean isActive) {

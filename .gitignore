@@ -28,6 +28,7 @@ doc/
 .env
 
 # Sensitive credentials (fill in locally, never commit)
+src/main/resources/db.local.properties
 src/main/resources/google-oauth.properties
 src/main/resources/mail.properties
 src/main/resources/ai.properties

@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import service.CourseService;
 import util.SessionUtil;
@@ -104,7 +105,7 @@ public class LessonServlet extends HttpServlet {
             "save-module", "delete-module", "save-course", "batch-save-lessons",
             "delete-course", "save-lesson-draft", "delete-lesson-draft",
             "generate-ai-description", "request-publish", "cancel-request-publish",
-            "archive-course", "unarchive-course", "cancel-archive"
+            "archive-course", "unarchive-course", "cancel-archive", "reorder-lessons"
         );
         if (mutatingActions.contains(action) && !"POST".equalsIgnoreCase(req.getMethod())) {
             SessionUtil.setFlashError(req, "Phương thức " + req.getMethod() + " không được hỗ trợ cho thao tác này. Vui lòng gửi yêu cầu qua POST.");
@@ -131,8 +132,13 @@ public class LessonServlet extends HttpServlet {
                 saveLesson(req, resp);
                 break;
             case "hide-lesson":
-            case "delete-lesson":
                 hideLesson(req, resp);
+                break;
+            case "delete-lesson":
+                deleteLesson(req, resp);
+                break;
+            case "reorder-lessons":
+                reorderLessons(req, resp);
                 break;
             case "toggle-lesson-status":
                 toggleLessonStatus(req, resp);
@@ -1084,6 +1090,104 @@ public class LessonServlet extends HttpServlet {
             SessionUtil.setFlashError(req, e.getMessage());
         }
         resp.sendRedirect(req.getContextPath() + "/expert/lessons?courseId=" + (courseIdStr != null ? courseIdStr : ""));
+    }
+
+    /**
+     * Xóa Bài học (Lesson):
+     * - Khóa học Draft / chưa có học viên: Xóa vĩnh viễn (Hard delete).
+     * - Khóa học đã xuất bản / đã có học viên học: Tự động chuyển sang Tạm ẩn (Soft delete).
+     * - Hỗ trợ cả AJAX call từ giao diện đếm ngược 5s lẫn form POST truyền thống.
+     */
+    private void deleteLesson(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        UserDto currentUser = SessionUtil.getCurrentUser(req);
+        if (currentUser == null) {
+            resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            resp.setContentType("application/json;charset=UTF-8");
+            resp.getWriter().write("{\"success\":false,\"message\":\"Vui lòng đăng nhập để thực hiện.\"}");
+            return;
+        }
+        String lessonIdStr = req.getParameter("lessonId");
+        String courseIdStr = req.getParameter("courseId");
+        boolean isAjax = "XMLHttpRequest".equalsIgnoreCase(req.getHeader("X-Requested-With"))
+                || (req.getHeader("Accept") != null && req.getHeader("Accept").contains("application/json"))
+                || "true".equalsIgnoreCase(req.getParameter("ajax"));
+        try {
+            if (lessonIdStr != null && !lessonIdStr.trim().isEmpty()) {
+                long lessonId = Long.parseLong(lessonIdStr.trim());
+                courseService.checkLessonOwnership(lessonId, currentUser);
+                courseService.checkLessonEditable(lessonId);
+                courseService.deleteLesson(lessonId);
+
+                if (isAjax) {
+                    resp.setContentType("application/json;charset=UTF-8");
+                    resp.getWriter().write("{\"success\":true,\"message\":\"Đã xóa vĩnh viễn bài học khỏi hệ thống thành công!\"}");
+                    return;
+                }
+                SessionUtil.setFlashSuccess(req, "Đã xóa bài học thành công!");
+            }
+        } catch (Exception e) {
+            if (isAjax) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"success\":false,\"message\":\"" + e.getMessage().replace("\"", "\\\"") + "\"}");
+                return;
+            }
+            SessionUtil.setFlashError(req, e.getMessage());
+        }
+        resp.sendRedirect(req.getContextPath() + "/expert/lessons?courseId=" + (courseIdStr != null ? courseIdStr : ""));
+    }
+
+    /**
+     * Sắp xếp lại thứ tự bài học (Kéo thả Drag & Drop):
+     * - Cập nhật danh sách ID bài học theo thứ tự mới trong Module.
+     */
+    private void reorderLessons(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        UserDto currentUser = SessionUtil.getCurrentUser(req);
+        if (currentUser == null) {
+            resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            resp.setContentType("application/json;charset=UTF-8");
+            resp.getWriter().write("{\"success\":false,\"message\":\"Vui lòng đăng nhập để thực hiện.\"}");
+            return;
+        }
+        String courseIdStr = req.getParameter("courseId");
+        String moduleIdStr = req.getParameter("moduleId");
+        String[] lessonIdStrs = req.getParameterValues("lessonIds[]");
+        if (lessonIdStrs == null || lessonIdStrs.length == 0) {
+            String singleParam = req.getParameter("lessonIds");
+            if (singleParam != null && !singleParam.trim().isEmpty()) {
+                lessonIdStrs = singleParam.split(",");
+            }
+        }
+        try {
+            long courseId = Long.parseLong(courseIdStr.trim());
+            long moduleId = Long.parseLong(moduleIdStr.trim());
+            courseService.checkCourseOwnership(courseId, currentUser);
+            courseService.checkCourseEditable(courseId);
+            courseService.checkModuleOwnership(moduleId, currentUser);
+
+            if (lessonIdStrs != null && lessonIdStrs.length > 0) {
+                List<Long> orderedIds = new ArrayList<>();
+                for (String s : lessonIdStrs) {
+                    if (s != null) {
+                        String cleaned = s.replace("[", "").replace("]", "").replace("'", "").replace("\"", "").trim();
+                        if (!cleaned.isEmpty()) {
+                            for (String part : cleaned.split(",")) {
+                                if (!part.trim().isEmpty()) {
+                                    orderedIds.add(Long.parseLong(part.trim()));
+                                }
+                            }
+                        }
+                    }
+                }
+                courseService.reorderLessons(moduleId, orderedIds);
+            }
+            resp.setContentType("application/json;charset=UTF-8");
+            resp.getWriter().write("{\"success\":true,\"message\":\"Đã cập nhật vị trí bài học thành công!\"}");
+        } catch (Exception e) {
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            resp.setContentType("application/json;charset=UTF-8");
+            resp.getWriter().write("{\"success\":false,\"message\":\"" + e.getMessage().replace("\"", "\\\"") + "\"}");
+        }
     }
 
     /**

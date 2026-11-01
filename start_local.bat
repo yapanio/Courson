@@ -8,10 +8,32 @@ echo                 COURSON LMS - KHOI CHAY LOCAL
 echo ======================================================================
 echo.
 
-set "JAVA_HOME=C:\Program Files\Java\jdk-17"
-set "CATALINA_HOME=C:\Program Files\Apache Software Foundation\Tomcat 10.1"
-set "PG_BIN=C:\Program Files\PostgreSQL\18\bin"
-set "PG_DATA=C:\Program Files\PostgreSQL\18\data"
+:: 0. Tu dong nhan dien duong dan Java, Tomcat, PostgreSQL linh hoat cho moi may
+if not exist "%JAVA_HOME%\bin\java.exe" (
+    set "JAVA_HOME=C:\Program Files\Java\jdk-17"
+    for /d %%i in ("C:\Program Files\Java\jdk-17*" "C:\Program Files\Java\jdk-21*" "C:\Program Files\Eclipse Adoptium\jdk-17*" "C:\Program Files\Eclipse Adoptium\jdk-21*") do (
+        if exist "%%i\bin\java.exe" set "JAVA_HOME=%%i"
+    )
+)
+
+if not exist "%CATALINA_HOME%\bin\catalina.bat" (
+    set "CATALINA_HOME=C:\Program Files\Apache Software Foundation\Tomcat 10.1"
+    for /d %%i in ("C:\Program Files\Apache Software Foundation\Tomcat 10*" "C:\apache-tomcat-10*" "D:\apache-tomcat-10*") do (
+        if exist "%%i\bin\catalina.bat" set "CATALINA_HOME=%%i"
+    )
+)
+
+if not exist "%PG_BIN%\pg_isready.exe" (
+    set "PG_BIN=C:\Program Files\PostgreSQL\18\bin"
+    set "PG_DATA=C:\Program Files\PostgreSQL\18\data"
+    for %%v in (18 17 16 15 14) do (
+        if exist "C:\Program Files\PostgreSQL\%%v\bin\pg_isready.exe" (
+            set "PG_BIN=C:\Program Files\PostgreSQL\%%v\bin"
+            set "PG_DATA=C:\Program Files\PostgreSQL\%%v\data"
+        )
+    )
+)
+
 set "APP_URL=http://localhost:8080/Courson/"
 
 :: 1. Kiem tra & Khoi dong PostgreSQL
@@ -36,23 +58,52 @@ if !errorlevel! equ 0 (
 )
 echo.
 
-:: 2. Tu dong dong bo giao dien JSP / WebApp
-echo [2/3] Dong bo giao dien JSP va webapp vao Tomcat...
-robocopy "%~dp0src\main\webapp" "%CATALINA_HOME%\webapps\Courson" /E /XO /NFL /NDL /NJH /NJS >nul 2>&1
-echo       [OK] Da dong bo webapp vao Tomcat.
+:: 2. Tu dong dong bo giao dien JSP, Classes va xoa cache
+echo [2/3] Dong bo giao dien JSP va class vao Tomcat...
+
+:: Kiem tra va dung Tomcat cu truoc khi xoa cache (tranh loi Jasper ClassNotFound)
+netstat -ano | find "8080" | find "LISTENING" >nul 2>&1
+if !errorlevel! equ 0 (
+    echo       [*] Dang dung Tomcat de dong bo ma nguon moi...
+    for /f "tokens=5" %%a in ('netstat -ano ^| find "8080" ^| find "LISTENING"') do (
+        taskkill /PID %%a /F >nul 2>&1
+    )
+    ping 127.0.0.1 -n 2 >nul
+)
+
+:: Tim lenh Maven linh hoat
+where mvn >nul 2>&1
+if !errorlevel! equ 0 (
+    set "MVN_CMD=mvn"
+) else (
+    set "MVN_CMD=C:\Program Files\NetBeans-17\netbeans\java\maven\bin\mvn.cmd"
+    for /d %%i in ("C:\Program Files\NetBeans-*\netbeans\java\maven\bin\mvn.cmd" "C:\Program Files\apache-maven*\bin\mvn.cmd") do (
+        if exist "%%i" set "MVN_CMD=%%i"
+    )
+)
+
+if exist "%MVN_CMD%" (
+    echo       [*] Kiem tra bien dich nhanh Java...
+    call "%MVN_CMD%" compile -DskipTests >nul 2>&1
+)
+robocopy "%~dp0src\main\webapp" "%CATALINA_HOME%\webapps\Courson" /E /NFL /NDL /NJH /NJS >nul 2>&1
+if exist "%~dp0target\classes" (
+    robocopy "%~dp0target\classes" "%CATALINA_HOME%\webapps\Courson\WEB-INF\classes" /E /NFL /NDL /NJH /NJS >nul 2>&1
+)
+if exist "%~dp0target\Courson\WEB-INF\lib" (
+    robocopy "%~dp0target\Courson\WEB-INF\lib" "%CATALINA_HOME%\webapps\Courson\WEB-INF\lib" /E /NFL /NDL /NJH /NJS >nul 2>&1
+)
+if exist "%CATALINA_HOME%\work\Catalina" (
+    rmdir /S /Q "%CATALINA_HOME%\work\Catalina" >nul 2>&1
+)
+echo       [OK] Da dong bo webapp va lam moi cache thanh cong.
 echo.
 
 :: 3. Kiem tra & Khoi dong Apache Tomcat 10.1
-echo [3/3] Kiem tra Apache Tomcat 10.1 (Port 8080)...
-netstat -ano | find "8080" | find "LISTENING" >nul 2>&1
-if !errorlevel! equ 0 (
-    echo       [OK] Tomcat 10.1 dang chay tren Port 8080.
-) else (
-    echo       [*] Dang khoi dong Tomcat 10.1...
-    start "Courson LMS - Tomcat Server" "%CATALINA_HOME%\bin\catalina.bat" run
-    echo       [*] Dang khoi chay webapp...
-    ping 127.0.0.1 -n 4 >nul
-)
+echo [3/3] Khoi dong Apache Tomcat 10.1 (Port 8080)...
+start "Courson LMS - Tomcat Server" "%CATALINA_HOME%\bin\catalina.bat" run
+echo       [*] Dang khoi chay webapp...
+ping 127.0.0.1 -n 4 >nul
 echo.
 
 echo ======================================================================

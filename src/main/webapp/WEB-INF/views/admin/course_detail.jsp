@@ -325,7 +325,7 @@ body {
                                     <div class="accordion-item border mb-2 rounded-2 overflow-hidden">
                                         <h2 class="accordion-header">
                                             <button class="accordion-button py-2 ${status.first ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#mod${m.id}">
-                                                <small class="fw-bold">Chương ${m.orderIndex}: ${m.title}</small>
+                                                <small class="fw-bold">${m.displayTitle}</small>
                                             </button>
                                         </h2>
                                         <div id="mod${m.id}" class="accordion-collapse collapse ${status.first ? 'show' : ''}">

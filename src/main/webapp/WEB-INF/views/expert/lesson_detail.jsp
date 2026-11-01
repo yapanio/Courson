@@ -57,7 +57,7 @@
                             </h4>
                             <p class="text-muted small mb-0">Nhập tiêu đề, tài liệu học tập và đường dẫn video bài giảng</p>
                         </div>
-                        <a href="${pageContext.request.contextPath}/expert/lessons?courseId=${course.id}" class="btn btn-outline-secondary btn-sm">
+                        <a href="${pageContext.request.contextPath}/expert/lessons?courseId=${course.id}" class="btn btn-outline-secondary btn-sm" id="btnBackToLessons">
                             <i class="bi bi-arrow-left me-1"></i>Quay lại
                         </a>
                     </div>
@@ -123,7 +123,7 @@
                                 <label class="form-label small fw-semibold">
                                     <i class="bi bi-eye text-primary me-1"></i>Trạng thái hiển thị
                                 </label>
-                                <select name="isActive" class="form-select">
+                                <select name="isActive" id="lessonIsActive" class="form-select">
                                     <option value="true" ${lesson == null || lesson.active ? 'selected' : ''}>Hiển thị (Công khai)</option>
                                     <option value="false" ${lesson != null && !lesson.active ? 'selected' : ''}>Tạm ẩn (Không công khai)</option>
                                 </select>
@@ -176,7 +176,7 @@
 
                         <div class="d-flex justify-content-between align-items-center pt-3 border-top flex-wrap gap-2">
                             <div class="d-flex align-items-center gap-3">
-                                <a href="${pageContext.request.contextPath}/expert/lessons?courseId=${course.id}" class="btn btn-light btn-sm">
+                                <a href="${pageContext.request.contextPath}/expert/lessons?courseId=${course.id}" class="btn btn-light btn-sm" id="btnCancelLesson">
                                     <i class="bi bi-arrow-left me-1"></i>Hủy bỏ
                                 </a>
                                 <div class="d-flex align-items-center gap-2">
@@ -439,6 +439,7 @@
             if (hiddenEl) {
                 hiddenEl.value = getEditorContent();
             }
+            ensureHistoryIntercepted();
             triggerAutoSave(false);
         });
 
@@ -469,12 +470,16 @@
     let cachedDraft = null;
 
     function getFormData() {
+        const activeEl = document.getElementById('lessonIsActive') || document.querySelector('select[name="isActive"]');
+        const newModEl = document.getElementById('newModuleTitle');
         return {
             courseId: courseId,
             lessonId: lessonId,
             moduleId: document.getElementById('lessonModuleId') ? document.getElementById('lessonModuleId').value : '',
+            newModuleTitle: newModEl ? newModEl.value : '',
             title: document.getElementById('lessonTitle') ? document.getElementById('lessonTitle').value : '',
             orderIndex: document.getElementById('lessonOrderIndex') ? document.getElementById('lessonOrderIndex').value : '1',
+            isActive: activeEl ? activeEl.value : 'true',
             videoUrl: document.getElementById('lessonVideoUrl') ? document.getElementById('lessonVideoUrl').value : '',
             documentUrl: document.getElementById('lessonDocumentUrl') ? document.getElementById('lessonDocumentUrl').value : '',
             content: getEditorContent()
@@ -486,7 +491,9 @@
         const cur = getFormData();
         return cur.title !== initialFormData.title ||
                cur.moduleId !== initialFormData.moduleId ||
+               cur.newModuleTitle !== initialFormData.newModuleTitle ||
                cur.orderIndex !== initialFormData.orderIndex ||
+               cur.isActive !== initialFormData.isActive ||
                cur.videoUrl !== initialFormData.videoUrl ||
                cur.documentUrl !== initialFormData.documentUrl ||
                cur.content !== initialFormData.content;
@@ -504,7 +511,7 @@
     }
 
     function saveDraftLocalOnly() {
-        if (isSubmitting) return;
+        if (isSubmitting || bypassExitPrompt) return;
         if (!isFormDirty()) return;
         try {
             const cur = getFormData();
@@ -761,12 +768,18 @@
         checkExistingDraft();
 
         // Lắng nghe thay đổi trên tất cả các trường để tự động lưu tức thì
-        const inputsToWatch = ['lessonTitle', 'lessonVideoUrl', 'lessonDocumentUrl', 'lessonModuleId', 'lessonOrderIndex'];
+        const inputsToWatch = ['lessonTitle', 'lessonVideoUrl', 'lessonDocumentUrl', 'lessonModuleId', 'lessonOrderIndex', 'newModuleTitle', 'lessonIsActive'];
         inputsToWatch.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                el.addEventListener('input', () => triggerAutoSave(false));
-                el.addEventListener('change', () => triggerAutoSave(true));
+                el.addEventListener('input', () => {
+                    ensureHistoryIntercepted();
+                    triggerAutoSave(false);
+                });
+                el.addEventListener('change', () => {
+                    ensureHistoryIntercepted();
+                    triggerAutoSave(true);
+                });
                 el.addEventListener('blur', () => triggerAutoSave(true));
             }
         });
@@ -832,6 +845,184 @@
     }
 
 
+
+    // =========================================================================
+    // BOOTSTRAP EXIT CONFIRMATION MODAL KHI ĐANG SỬA MÀ THOÁT RA
+    // =========================================================================
+    let pendingNavigationUrl = null;
+    let bypassExitPrompt = false;
+    let isHistoryIntercepted = false;
+
+    function getExitModal() {
+        const modalEl = document.getElementById('unsavedChangesModal');
+        if (!modalEl) return null;
+        if (window.bootstrap && bootstrap.Modal) {
+            return bootstrap.Modal.getOrCreateInstance(modalEl);
+        }
+        return null;
+    }
+
+    function showExitModal(targetUrl) {
+        pendingNavigationUrl = targetUrl;
+        const modal = getExitModal();
+        if (modal) {
+            modal.show();
+        } else {
+            if (confirm('Bạn có thay đổi chưa lưu trong bài học. Bạn có chắc chắn muốn rời đi không?')) {
+                bypassExitPrompt = true;
+                window.location.href = targetUrl;
+            }
+        }
+    }
+
+    function ensureHistoryIntercepted() {
+        if (!isHistoryIntercepted && isFormDirty()) {
+            try {
+                history.pushState({ dirtyLesson: true }, '', window.location.href);
+                isHistoryIntercepted = true;
+            } catch (e) {}
+        }
+    }
+
+    // Bắt sự kiện click vào các liên kết điều hướng khi form có thay đổi chưa lưu
+    document.addEventListener('click', function(e) {
+        if (bypassExitPrompt || isSubmitting) return;
+
+        const anchor = e.target.closest('a');
+        if (!anchor) return;
+
+        // Bỏ qua các nút toggle / dismiss modal Bootstrap nội bộ
+        if (anchor.getAttribute('data-bs-dismiss') || anchor.getAttribute('data-bs-toggle')) return;
+
+        const href = anchor.getAttribute('href');
+        if (!href || href === '#' || href.startsWith('javascript:') || href.startsWith('#')) return;
+        if (anchor.target === '_blank') return;
+
+        if (isFormDirty()) {
+            e.preventDefault();
+            e.stopPropagation();
+            showExitModal(anchor.href);
+        }
+    }, true);
+
+    // Bắt sự kiện bấm nút Back / Forward trên trình duyệt
+    window.addEventListener('popstate', function(e) {
+        if (bypassExitPrompt || isSubmitting) return;
+
+        if (isFormDirty()) {
+            try {
+                history.pushState({ dirtyLesson: true }, '', window.location.href);
+            } catch (err) {}
+            showExitModal('HISTORY_BACK');
+        }
+    });
+
+    // Phím tắt Ctrl + S để lưu nhanh tức thì
+    window.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+            e.preventDefault();
+            const formEl = document.getElementById('lessonForm');
+            if (formEl) {
+                const submitBtn = document.getElementById('btnSubmitLesson');
+                if (submitBtn) submitBtn.click();
+                else formEl.submit();
+            }
+        }
+    });
+
+    // Xử lý sự kiện các nút bên trong Exit Modal khi DOM sẵn sàng
+    document.addEventListener('DOMContentLoaded', function() {
+        // Nút "Vẫn thoát (Không lưu)"
+        const btnDiscard = document.getElementById('modalBtnDiscardAndExit');
+        if (btnDiscard) {
+            btnDiscard.addEventListener('click', function() {
+                bypassExitPrompt = true;
+                saveDraftLocalOnly(); // Lưu bản nháp một lần cuối để phòng hờ
+
+                const modal = getExitModal();
+                if (modal) modal.hide();
+
+                if (pendingNavigationUrl === 'HISTORY_BACK') {
+                    history.go(-2);
+                } else if (pendingNavigationUrl) {
+                    window.location.href = pendingNavigationUrl;
+                } else {
+                    window.location.href = '${pageContext.request.contextPath}/expert/lessons?courseId=${course.id}';
+                }
+            });
+        }
+
+        // Nút "Lưu bài học rồi thoát"
+        const btnSaveExit = document.getElementById('modalBtnSaveAndExit');
+        if (btnSaveExit) {
+            btnSaveExit.addEventListener('click', function() {
+                bypassExitPrompt = true;
+                const modal = getExitModal();
+                if (modal) modal.hide();
+
+                const formEl = document.getElementById('lessonForm');
+                if (formEl) {
+                    if (formEl.checkValidity && !formEl.checkValidity()) {
+                        formEl.reportValidity();
+                        return;
+                    }
+                    const submitBtn = document.getElementById('btnSubmitLesson');
+                    if (submitBtn) {
+                        submitBtn.click();
+                    } else {
+                        const hiddenEl = document.getElementById('lessonContent');
+                        if (hiddenEl) hiddenEl.value = getEditorContent();
+                        isSubmitting = true;
+                        formEl.submit();
+                    }
+                }
+            });
+        }
+    });
 </script>
+
+
+<!-- Modal Bootstrap: Cảnh báo xác nhận khi đang sửa bài học mà thoát ra -->
+<div class="modal fade" id="unsavedChangesModal" tabindex="-1" aria-labelledby="unsavedChangesModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+        <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden">
+            <div class="modal-header border-0 pb-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
+                        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark fs-6 mb-0" id="unsavedChangesModalLabel">Chưa lưu thay đổi bài học!</h5>
+                        <span class="text-muted small">Cảnh báo thoát khỏi trang soạn thảo</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body px-4 py-3">
+                <p class="text-secondary small mb-3">
+                    Bạn đang chỉnh sửa nội dung bài học và có những thay đổi chưa được lưu lại. Nếu rời khỏi trang bây giờ, các thay đổi mới nhất có thể chưa được lưu chính thức vào hệ thống.
+                </p>
+                <div class="p-3 bg-light rounded-3 border small mb-2 d-flex align-items-start gap-2">
+                    <i class="bi bi-shield-check text-success fs-5 mt-n1 flex-shrink-0"></i>
+                    <div>
+                        <strong class="text-dark d-block mb-1">Dữ liệu được bảo toàn an toàn:</strong>
+                        <span class="text-muted">Hệ thống đã tự động lưu lại bản nháp trên trình duyệt. Bạn có thể khôi phục lại khi quay lại soạn thảo bài học này.</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-4 px-4 flex-column gap-2">
+                <button type="button" class="btn btn-primary w-100 fw-semibold py-2.5 rounded-3 shadow-sm d-flex align-items-center justify-content-center" id="modalBtnSaveAndExit">
+                    <i class="bi bi-floppy2-fill me-2"></i>Lưu bài học rồi thoát
+                </button>
+                <button type="button" class="btn btn-outline-danger w-100 fw-medium py-2 rounded-3 d-flex align-items-center justify-content-center" id="modalBtnDiscardAndExit">
+                    <i class="bi bi-box-arrow-right me-2"></i>Rời đi (Không lưu thay đổi)
+                </button>
+                <button type="button" class="btn btn-link text-muted text-decoration-none small py-1" data-bs-dismiss="modal">
+                    <i class="bi bi-arrow-return-left me-1"></i>Ở lại tiếp tục chỉnh sửa
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <jsp:include page="../common/footer.jsp" />

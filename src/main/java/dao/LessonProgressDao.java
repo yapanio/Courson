@@ -108,6 +108,17 @@ public class LessonProgressDao {
         return BigDecimal.ZERO;
     }
 
+    
+    public boolean hasProgress(Connection con, long lessonId) throws SQLException {
+        String sql = "SELECT 1 FROM lesson_progress WHERE lesson_id = ? LIMIT 1";
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setLong(1, lessonId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
     private LessonProgress mapRow(ResultSet rs) throws SQLException {
         LessonProgress lp = new LessonProgress();
         lp.setId(rs.getLong("id"));

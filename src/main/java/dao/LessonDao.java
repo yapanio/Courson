@@ -13,9 +13,8 @@ import java.util.Optional;
 public class LessonDao {
     private static final String SQL_FIND_BY_MODULE = "SELECT id, module_id, title, content, video_url, document_url, order_index, is_active, created_at, updated_at FROM lessons WHERE module_id = ? ORDER BY order_index ASC";
     private static final String SQL_FIND_BY_ID = "SELECT id, module_id, title, content, video_url, document_url, order_index, is_active, created_at, updated_at FROM lessons WHERE id = ?";
-    private static final String SQL_EXISTS_ORDER = "SELECT COUNT(1) FROM lessons WHERE module_id = ? AND order_index = ? AND (? IS NULL OR id != ?)";
     private static final String SQL_INSERT = "INSERT INTO lessons (module_id, title, content, video_url, document_url, order_index, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id";
-    private static final String SQL_UPDATE = "UPDATE lessons SET title = ?, content = ?, video_url = ?, document_url = ?, order_index = ?, is_active = ?, updated_at = ? WHERE id = ?";
+    private static final String SQL_UPDATE = "UPDATE lessons SET module_id = ?, title = ?, content = ?, video_url = ?, document_url = ?, order_index = ?, is_active = ?, updated_at = ? WHERE id = ?";
     private static final String SQL_UPDATE_ACTIVE = "UPDATE lessons SET is_active = ?, updated_at = now() WHERE id = ?";
     private static final String SQL_DELETE = "DELETE FROM lessons WHERE id = ?";
 
@@ -45,15 +44,14 @@ public class LessonDao {
     }
 
     public boolean existsOrderIndex(Connection con, long moduleId, int order, Long excludeId) throws SQLException {
-        try (PreparedStatement ps = con.prepareStatement(SQL_EXISTS_ORDER)) {
+        String sql = (excludeId == null)
+                ? "SELECT COUNT(1) FROM lessons WHERE module_id = ? AND order_index = ?"
+                : "SELECT COUNT(1) FROM lessons WHERE module_id = ? AND order_index = ? AND id != ?";
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setLong(1, moduleId);
             ps.setInt(2, order);
-            if (excludeId == null) {
-                ps.setNull(3, java.sql.Types.BIGINT);
-                ps.setNull(4, java.sql.Types.BIGINT);
-            } else {
+            if (excludeId != null) {
                 ps.setLong(3, excludeId);
-                ps.setLong(4, excludeId);
             }
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -90,14 +88,15 @@ public class LessonDao {
 
     public boolean update(Connection con, Lesson entity) throws SQLException {
         try (PreparedStatement ps = con.prepareStatement(SQL_UPDATE)) {
-            ps.setString(1, entity.getTitle());
-            ps.setString(2, entity.getContent());
-            ps.setString(3, entity.getVideoUrl());
-            ps.setString(4, entity.getDocumentUrl());
-            ps.setInt(5, entity.getOrderIndex());
-            ps.setBoolean(6, entity.isActive());
-            ps.setObject(7, OffsetDateTime.now());
-            ps.setLong(8, entity.getId());
+            ps.setLong(1, entity.getModuleId());
+            ps.setString(2, entity.getTitle());
+            ps.setString(3, entity.getContent());
+            ps.setString(4, entity.getVideoUrl());
+            ps.setString(5, entity.getDocumentUrl());
+            ps.setInt(6, entity.getOrderIndex());
+            ps.setBoolean(7, entity.isActive());
+            ps.setObject(8, OffsetDateTime.now());
+            ps.setLong(9, entity.getId());
             return ps.executeUpdate() > 0;
         }
     }

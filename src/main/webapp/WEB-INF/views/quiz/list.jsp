@@ -1304,7 +1304,7 @@ body {
                                         <select name="moduleId" id="modalModuleSelect" class="form-select saas-form-control"
                                             required>
                                             <c:forEach var="m" items="${course.modules}">
-                                                <option value="${m.id}">Chương ${m.orderIndex}: ${m.title}</option>
+                                                <option value="${m.id}">${m.displayTitle}</option>
                                             </c:forEach>
                                         </select>
                                     </div>
@@ -1423,7 +1423,7 @@ body {
                                         <select name="moduleId" id="modalQModuleSelect" class="form-select saas-form-control"
                                             required>
                                             <c:forEach var="m" items="${course.modules}">
-                                                <option value="${m.id}">Chương ${m.orderIndex}: ${m.title}</option>
+                                                <option value="${m.id}">${m.displayTitle}</option>
                                             </c:forEach>
                                         </select>
                                     </div>
@@ -2023,4 +2023,4 @@ body {
                     }
                 </script>
 
-                <jsp:include page="../common/footer.jsp" />
+                <jsp:include page="../common/footer.jsp" />
