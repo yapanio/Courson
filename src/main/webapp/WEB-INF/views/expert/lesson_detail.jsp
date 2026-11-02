@@ -89,7 +89,7 @@
                                     <select name="moduleId" id="lessonModuleId" class="form-select saas-form-control" required onchange="handleModuleSelectChange(this.value)">
                                         <c:forEach var="moduleItem" items="${course.modules}">
                                             <option value="${moduleItem.id}" ${moduleItem.id == curModId ? 'selected' : ''}>
-                                                Chương ${moduleItem.orderIndex}: ${moduleItem.title}
+                                                <c:out value="${moduleItem.displayTitle}" />
                                             </option>
                                         </c:forEach>
                                         <option value="__NEW__" class="fw-bold text-primary">+ Tạo Chương học mới...</option>
@@ -106,7 +106,7 @@
                                     <span class="input-group-text bg-light small"><i class="bi bi-folder-plus text-primary"></i></span>
                                     <input type="text" name="newModuleTitle" id="newModuleTitle" class="form-control"
                                            placeholder="Nhập tên chương học mới..."
-                                           value="${empty course.modules ? 'Chương 1: Khởi động & Giới thiệu' : ''}">
+                                           value="${empty course.modules ? 'Khởi động & Giới thiệu' : ''}">
                                 </div>
                             </div>
                         </div>

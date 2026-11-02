@@ -638,7 +638,7 @@ body {
                                         <button type="button" class="btn-icon-action" onclick="openEditModuleModal('${m.id}', '${fn:escapeXml(m.title)}', '${m.orderIndex}')" title="Đổi tên chương">
                                             <i class="bi bi-pencil"></i>
                                         </button>
-                                        <button type="button" class="btn-icon-action text-danger" onclick="confirmDeleteModule('${fn:escapeXml(m.title)}', '${pageContext.request.contextPath}/expert/delete-module?courseId=${course.id}&moduleId=${m.id}', ${fn:length(m.lessons)})" title="Xóa chương này">
+                                        <button type="button" class="btn-icon-action text-danger" onclick="confirmDeleteModule('${fn:escapeXml(m.title)}', '${m.id}', ${fn:length(m.lessons)})" title="Xóa chương này">
                                             <i class="bi bi-trash3"></i>
                                         </button>
                                     </c:otherwise>
@@ -754,40 +754,6 @@ body {
     </div>
 </main>
 
-<!-- Floating Undo Delete Countdown Toast (5s Rollback / Ctrl+Z) -->
-<div id="undoToastContainer" class="position-fixed bottom-0 start-50 translate-middle-x pb-4" style="z-index: 1080; display: none;">
-    <div class="shadow-lg rounded-4 p-3 border border-secondary text-white" style="background: #1e293b; min-width: 380px; max-width: 520px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);">
-        <div class="d-flex align-items-center justify-content-between gap-3 mb-2">
-            <div class="d-flex align-items-center gap-2 text-truncate">
-                <div class="rounded-circle bg-danger-subtle text-danger d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px; font-size: 1.1rem;">
-                    <i class="bi bi-trash3-fill"></i>
-                </div>
-                <div class="min-w-0">
-                    <div class="text-white-50 small" style="font-size: 11px;">Đang chuẩn bị xóa bài học...</div>
-                    <div class="fw-bold text-white text-truncate small" id="undoLessonTitle" style="max-width: 200px;"></div>
-                </div>
-            </div>
-            <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                <button type="button" class="btn btn-warning btn-sm fw-bold px-3 py-1.5 rounded-pill shadow-sm d-inline-flex align-items-center gap-1.5" onclick="rollbackDelete()" style="font-size: 12px;">
-                    <i class="bi bi-arrow-counterclockwise fs-6"></i>
-                    <span>Hoàn tác (<strong id="undoCountdownSeconds">5</strong>s)</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm text-white-50 border-0 p-1" onclick="commitDeleteNow()" title="Xóa ngay lập tức">
-                    <i class="bi bi-x-lg"></i>
-                </button>
-            </div>
-        </div>
-        <div class="d-flex align-items-center justify-content-between text-muted mt-1 px-1" style="font-size: 11px;">
-            <span><i class="bi bi-keyboard me-1 text-light"></i>Bấm <kbd class="bg-dark text-white border border-secondary px-1.5 py-0.5 rounded">Ctrl</kbd> + <kbd class="bg-dark text-white border border-secondary px-1.5 py-0.5 rounded">Z</kbd> để hoàn tác</span>
-            <span id="undoStatusText" class="text-warning-emphasis">Hủy sau 5s...</span>
-        </div>
-        <!-- Countdown Progress Bar -->
-        <div class="progress mt-2" style="height: 3px; background-color: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden;">
-            <div id="undoProgressBar" class="progress-bar bg-warning" role="progressbar" style="width: 100%; transition: width 0.05s linear;"></div>
-        </div>
-    </div>
-</div>
-
 <!-- Add Module Modal -->
 <div class="modal fade" id="addModuleModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
@@ -803,7 +769,7 @@ body {
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label class="form-label saas-form-label">Tên chương học <span class="text-danger">*</span></label>
-                        <input type="text" name="title" class="form-control saas-form-control" required placeholder="Ví dụ: Chương 1: Cài đặt và cấu hình">
+                        <input type="text" name="title" class="form-control saas-form-control" required placeholder="Ví dụ: Cài đặt và cấu hình môi trường">
                     </div>
                 </div>
                 <div class="modal-footer saas-modal-footer">
@@ -852,7 +818,7 @@ body {
         new bootstrap.Modal(document.getElementById('editModuleModal')).show();
     }
 
-    function confirmDeleteModule(title, url, lessonCount) {
+    function confirmDeleteModule(title, moduleId, lessonCount) {
         if (lessonCount && lessonCount > 0) {
             showConfirmModal({
                 title: 'Không thể xóa Chương học',
@@ -866,17 +832,7 @@ body {
             });
             return;
         }
-        showConfirmModal({
-            title: 'Xác nhận xóa Chương học',
-            method: 'POST',
-            html: 'Bạn có chắc chắn muốn xóa chương "<strong>' + (title || '') + '</strong>"?<br><span class="text-danger small mt-2 d-inline-block"><i class="bi bi-trash3 me-1"></i>Chương học này đang trống và sẽ được xóa vĩnh viễn khỏi khóa học.</span>',
-            type: 'danger',
-            icon: 'bi bi-trash3-fill',
-            confirmText: 'Xóa chương',
-            confirmIcon: 'bi bi-trash3 me-1',
-            confirmBtnClass: 'btn-danger',
-            confirmUrl: url
-        });
+        startDeleteModuleCountdown(moduleId, title);
     }
 
     // ==========================================
@@ -913,70 +869,24 @@ body {
     // ==========================================
     // 2. XÓA BÀI HỌC VỚI COUNTDOWN 5s & ROLLBACK (Ctrl+Z)
     // ==========================================
-    let pendingDeleteState = null;
-    let deleteTimer = null;
-    let progressTimer = null;
-
     function startDeleteCountdown(lessonId, lessonTitle, moduleId) {
-        // Nếu có bài học khác đang chờ xóa dở, commit bài đó ngay
-        if (pendingDeleteState) {
-            commitDeleteNow();
-        }
+        CoursonRollback.start({
+            element: 'lessonRow-' + lessonId,
+            type: 'Bài học',
+            title: lessonTitle,
+            endpoint: '${pageContext.request.contextPath}/expert/delete-lesson',
+            body: 'courseId=${course.id}&lessonId=' + encodeURIComponent(lessonId) + '&ajax=true'
+        });
+    }
 
-        const row = document.getElementById('lessonRow-' + lessonId);
-        if (!row) return;
-
-        pendingDeleteState = {
-            lessonId: lessonId,
-            lessonTitle: lessonTitle,
-            moduleId: moduleId,
-            startTime: Date.now(),
-            totalDuration: 5000,
-            rowElement: row
-        };
-
-        // Làm mờ và khóa tương tác hàng bài học tạm thời
-        row.style.opacity = '0.25';
-        row.style.pointerEvents = 'none';
-        row.style.filter = 'grayscale(100%)';
-
-        // Hiển thị thanh đếm ngược Toast
-        const container = document.getElementById('undoToastContainer');
-        const titleEl = document.getElementById('undoLessonTitle');
-        const secEl = document.getElementById('undoCountdownSeconds');
-        const pBar = document.getElementById('undoProgressBar');
-        const statusText = document.getElementById('undoStatusText');
-
-        titleEl.textContent = lessonTitle;
-        secEl.textContent = '5';
-        pBar.style.width = '100%';
-        pBar.className = 'progress-bar bg-warning';
-        statusText.textContent = 'Xóa vĩnh viễn sau 5s...';
-        container.style.display = 'block';
-
-        let elapsed = 0;
-        const interval = 50;
-        progressTimer = setInterval(() => {
-            elapsed += interval;
-            const remaining = Math.max(0, 5000 - elapsed);
-            const remainingSec = Math.ceil(remaining / 1000);
-            const percent = (remaining / 5000) * 100;
-
-            secEl.textContent = remainingSec;
-            pBar.style.width = percent + '%';
-            if (remainingSec <= 2) {
-                pBar.className = 'progress-bar bg-danger';
-            }
-
-            if (elapsed >= 5000) {
-                clearInterval(progressTimer);
-                progressTimer = null;
-            }
-        }, interval);
-
-        deleteTimer = setTimeout(() => {
-            commitDeleteNow();
-        }, 5000);
+    function startDeleteModuleCountdown(moduleId, moduleTitle) {
+        CoursonRollback.start({
+            element: 'moduleCard-' + moduleId,
+            type: 'Chương học',
+            title: moduleTitle,
+            endpoint: '${pageContext.request.contextPath}/expert/delete-module',
+            body: 'courseId=${course.id}&moduleId=' + encodeURIComponent(moduleId) + '&ajax=true'
+        });
     }
 
         // ==========================================
@@ -1143,107 +1053,7 @@ body {
         initLessonDragAndDrop();
     });
 
-// Rollback (Hoàn tác xóa) - Khi bấm nút Hoàn tác hoặc nhấn phím Ctrl + Z
-    function rollbackDelete() {
-        if (!pendingDeleteState) return;
 
-        if (deleteTimer) { clearTimeout(deleteTimer); deleteTimer = null; }
-        if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
-
-        const row = pendingDeleteState.rowElement;
-        const title = pendingDeleteState.lessonTitle;
-        pendingDeleteState = null;
-
-        document.getElementById('undoToastContainer').style.display = 'none';
-
-        if (row) {
-            row.style.opacity = '1';
-            row.style.pointerEvents = '';
-            row.style.filter = '';
-            row.style.boxShadow = '0 0 0 2px #22c55e';
-            setTimeout(() => { row.style.boxShadow = ''; }, 1200);
-        }
-
-        showFloatingToast('Đã hoàn tác (Rollback)! Bài học "' + title + '" được giữ nguyên.', 'success');
-    }
-
-    // Thực sự xóa vĩnh viễn khỏi CSDL khi hết 5s hoặc bấm Xóa ngay
-    function commitDeleteNow() {
-        if (!pendingDeleteState) return;
-
-        if (deleteTimer) { clearTimeout(deleteTimer); deleteTimer = null; }
-        if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
-
-        const state = pendingDeleteState;
-        pendingDeleteState = null;
-        document.getElementById('undoToastContainer').style.display = 'none';
-
-        const row = state.rowElement;
-        const lessonId = state.lessonId;
-        const courseId = '${course.id}';
-
-        fetch('${pageContext.request.contextPath}/expert/delete-lesson', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: 'courseId=' + encodeURIComponent(courseId) + '&lessonId=' + encodeURIComponent(lessonId) + '&ajax=true'
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                if (row) {
-                    row.style.transition = 'all 0.3s ease';
-                    row.style.maxHeight = '0px';
-                    row.style.padding = '0px';
-                    row.style.margin = '0px';
-                    row.style.overflow = 'hidden';
-                    setTimeout(() => { row.remove(); }, 350);
-                }
-                showFloatingToast(data.message || 'Đã xóa bài học thành công!', 'success');
-            } else {
-                if (row) {
-                    row.style.opacity = '1';
-                    row.style.pointerEvents = '';
-                    row.style.filter = '';
-                }
-                alert(data.message || 'Lỗi khi xóa bài học.');
-            }
-        })
-        .catch(err => {
-            console.error('Lỗi kết nối khi xóa bài học:', err);
-            // Nếu mất mạng hoặc lỗi máy chủ, tự động khôi phục giao diện và thông báo an toàn
-            if (row) {
-                row.style.opacity = '1';
-                row.style.pointerEvents = '';
-                row.style.filter = '';
-                row.style.boxShadow = '0 0 0 2px #ef4444';
-                setTimeout(() => { row.style.boxShadow = ''; }, 1500);
-            }
-            showFloatingToast('Mất kết nối mạng! Không thể gửi lệnh xóa tới máy chủ. Bài học đã được tự động giữ nguyên.', 'danger');
-        });
-    }
-
-    // Lắng nghe phím tắt Ctrl + Z (hoặc Cmd + Z trên macOS)
-    window.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
-            if (pendingDeleteState) {
-                e.preventDefault();
-                rollbackDelete();
-            }
-        }
-    });
-
-    // Nếu người dùng tải lại trang (F5) hoặc đóng tab khi đang trong 5s chờ đếm ngược:
-    // Theo nguyên tắc Fail-safe: Lệnh xóa bị hủy bỏ (Abort) và CSDL hoàn toàn không bị đụng tới.
-    window.addEventListener('beforeunload', function() {
-        if (pendingDeleteState) {
-            if (deleteTimer) clearTimeout(deleteTimer);
-            if (progressTimer) clearInterval(progressTimer);
-            pendingDeleteState = null;
-        }
-    });
 
     function showFloatingToast(message, type) {
         let toastContainer = document.getElementById('floatingNotificationToast');

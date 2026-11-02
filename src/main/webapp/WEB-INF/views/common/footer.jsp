@@ -435,5 +435,248 @@
     <c:remove var="flashToastType" scope="session"/>
 </c:if>
 
+
+<!-- Universal Floating Undo Delete Countdown Toast (5s Rollback / Ctrl+Z) -->
+<div id="coursonUndoToastContainer" class="position-fixed bottom-0 start-50 translate-middle-x pb-4" style="z-index: 1080; display: none;">
+    <div class="shadow-lg rounded-4 p-3 border border-secondary text-white" style="background: #1e293b; min-width: 380px; max-width: 520px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);">
+        <div class="d-flex align-items-center justify-content-between gap-3 mb-2">
+            <div class="d-flex align-items-center gap-2 text-truncate">
+                <div class="rounded-circle bg-danger-subtle text-danger d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px; font-size: 1.1rem;">
+                    <i class="bi bi-trash3-fill"></i>
+                </div>
+                <div class="min-w-0">
+                    <div class="text-white-50 small" id="coursonUndoLabel" style="font-size: 11px;">Đang chuẩn bị xóa...</div>
+                    <div class="fw-bold text-white text-truncate small" id="coursonUndoTitle" style="max-width: 220px;"></div>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                <button type="button" class="btn btn-warning btn-sm fw-bold px-3 py-1.5 rounded-pill shadow-sm d-inline-flex align-items-center gap-1.5" onclick="window.CoursonRollback && window.CoursonRollback.rollback()" style="font-size: 12px;">
+                    <i class="bi bi-arrow-counterclockwise fs-6"></i>
+                    <span>Hoàn tác (<strong id="coursonUndoSeconds">5</strong>s)</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm text-white-50 border-0 p-1" onclick="window.CoursonRollback && window.CoursonRollback.commitNow()" title="Xóa ngay lập tức">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
+        <div class="d-flex align-items-center justify-content-between text-muted mt-1 px-1" style="font-size: 11px;">
+            <span><i class="bi bi-keyboard me-1 text-light"></i>Bấm <kbd class="bg-dark text-white border border-secondary px-1.5 py-0.5 rounded">Ctrl</kbd> + <kbd class="bg-dark text-white border border-secondary px-1.5 py-0.5 rounded">Z</kbd> để hoàn tác</span>
+            <span id="coursonUndoStatusText" class="text-warning-emphasis">Hủy sau 5s...</span>
+        </div>
+        <!-- Countdown Progress Bar -->
+        <div class="progress mt-2" style="height: 3px; background-color: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden;">
+            <div id="coursonUndoProgressBar" class="progress-bar bg-warning" role="progressbar" style="width: 100%; transition: width 0.05s linear;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function(global) {
+        let pendingState = null;
+        let deleteTimer = null;
+        let progressTimer = null;
+
+        const CoursonRollback = {
+            start: function(options) {
+                if (pendingState) {
+                    this.commitNow();
+                }
+
+                let el = typeof options.element === 'string' ? document.getElementById(options.element) : options.element;
+
+                pendingState = {
+                    element: el,
+                    type: options.type || 'mục',
+                    title: options.title || '',
+                    endpoint: options.endpoint,
+                    body: options.body || '',
+                    headers: options.headers || {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    onSuccess: options.onSuccess,
+                    onError: options.onError,
+                    onRollback: options.onRollback,
+                    duration: options.duration || 5000,
+                    startTime: Date.now()
+                };
+
+                if (el) {
+                    el.style.opacity = '0.25';
+                    el.style.pointerEvents = 'none';
+                    el.style.filter = 'grayscale(100%)';
+                    el.style.transition = 'all 0.25s ease';
+                }
+
+                const container = document.getElementById('coursonUndoToastContainer');
+                const labelEl = document.getElementById('coursonUndoLabel');
+                const titleEl = document.getElementById('coursonUndoTitle');
+                const secEl = document.getElementById('coursonUndoSeconds');
+                const pBar = document.getElementById('coursonUndoProgressBar');
+                const statusText = document.getElementById('coursonUndoStatusText');
+
+                if (labelEl) labelEl.textContent = 'Đang chuẩn bị xóa ' + (pendingState.type.toLowerCase()) + '...';
+                if (titleEl) titleEl.textContent = pendingState.title;
+                if (secEl) secEl.textContent = Math.ceil(pendingState.duration / 1000);
+                if (pBar) {
+                    pBar.style.width = '100%';
+                    pBar.className = 'progress-bar bg-warning';
+                }
+                if (statusText) statusText.textContent = 'Xóa vĩnh viễn sau ' + Math.ceil(pendingState.duration / 1000) + 's...';
+                if (container) container.style.display = 'block';
+
+                let elapsed = 0;
+                const interval = 50;
+                progressTimer = setInterval(() => {
+                    elapsed += interval;
+                    const remaining = Math.max(0, pendingState.duration - elapsed);
+                    const remainingSec = Math.ceil(remaining / 1000);
+                    const percent = (remaining / pendingState.duration) * 100;
+
+                    if (secEl) secEl.textContent = remainingSec;
+                    if (pBar) {
+                        pBar.style.width = percent + '%';
+                        if (remainingSec <= 2) {
+                            pBar.className = 'progress-bar bg-danger';
+                        }
+                    }
+
+                    if (elapsed >= pendingState.duration) {
+                        clearInterval(progressTimer);
+                        progressTimer = null;
+                    }
+                }, interval);
+
+                deleteTimer = setTimeout(() => {
+                    this.commitNow();
+                }, pendingState.duration);
+            },
+
+            rollback: function() {
+                if (!pendingState) return;
+
+                if (deleteTimer) { clearTimeout(deleteTimer); deleteTimer = null; }
+                if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+
+                const state = pendingState;
+                pendingState = null;
+
+                const container = document.getElementById('coursonUndoToastContainer');
+                if (container) container.style.display = 'none';
+
+                const el = state.element;
+                if (el) {
+                    el.style.opacity = '1';
+                    el.style.pointerEvents = '';
+                    el.style.filter = '';
+                    el.style.boxShadow = '0 0 0 2px #22c55e';
+                    setTimeout(() => { el.style.boxShadow = ''; }, 1200);
+                }
+
+                if (typeof state.onRollback === 'function') {
+                    state.onRollback(el);
+                } else {
+                    if (global.CoursonToast) {
+                        global.CoursonToast.show('success', 'Đã hoàn tác (Rollback)! ' + state.type + ' "' + state.title + '" được giữ nguyên.');
+                    }
+                }
+            },
+
+            commitNow: function() {
+                if (!pendingState) return;
+
+                if (deleteTimer) { clearTimeout(deleteTimer); deleteTimer = null; }
+                if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+
+                const state = pendingState;
+                pendingState = null;
+
+                const container = document.getElementById('coursonUndoToastContainer');
+                if (container) container.style.display = 'none';
+
+                const el = state.element;
+
+                fetch(state.endpoint, {
+                    method: 'POST',
+                    headers: state.headers,
+                    body: state.body
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (typeof state.onSuccess === 'function') {
+                            state.onSuccess(data, el);
+                        } else {
+                            if (el) {
+                                el.style.transition = 'all 0.3s ease';
+                                el.style.maxHeight = '0px';
+                                el.style.padding = '0px';
+                                el.style.margin = '0px';
+                                el.style.overflow = 'hidden';
+                                el.style.opacity = '0';
+                                setTimeout(() => { el.remove(); }, 350);
+                            }
+                            if (global.CoursonToast) {
+                                global.CoursonToast.show('success', data.message || ('Đã xóa ' + state.type.toLowerCase() + ' thành công!'));
+                            }
+                        }
+                    } else {
+                        if (el) {
+                            el.style.opacity = '1';
+                            el.style.pointerEvents = '';
+                            el.style.filter = '';
+                        }
+                        if (typeof state.onError === 'function') {
+                            state.onError(data.message, el);
+                        } else {
+                            if (global.CoursonToast) {
+                                global.CoursonToast.show('error', data.message || ('Lỗi khi xóa ' + state.type.toLowerCase()));
+                            } else {
+                                alert(data.message || 'Lỗi khi xóa.');
+                            }
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Lỗi khi gửi lệnh xóa:', err);
+                    if (el) {
+                        el.style.opacity = '1';
+                        el.style.pointerEvents = '';
+                        el.style.filter = '';
+                        el.style.boxShadow = '0 0 0 2px #ef4444';
+                        setTimeout(() => { el.style.boxShadow = ''; }, 1500);
+                    }
+                    if (typeof state.onError === 'function') {
+                        state.onError(err, el);
+                    } else {
+                        if (global.CoursonToast) {
+                            global.CoursonToast.show('error', 'Mất kết nối mạng! Không thể xóa ' + state.type.toLowerCase() + '. Dữ liệu đã được tự động giữ nguyên.');
+                        }
+                    }
+                });
+            }
+        };
+
+        window.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+                if (pendingState) {
+                    e.preventDefault();
+                    CoursonRollback.rollback();
+                }
+            }
+        });
+
+        window.addEventListener('beforeunload', function() {
+            if (pendingState) {
+                if (deleteTimer) clearTimeout(deleteTimer);
+                if (progressTimer) clearInterval(progressTimer);
+                pendingState = null;
+            }
+        });
+
+        global.CoursonRollback = CoursonRollback;
+    })(window);
+</script>
+
 </body>
 </html>

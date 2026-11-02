@@ -246,9 +246,17 @@ public class QuizServlet extends HttpServlet {
         String quizIdStr = req.getParameter("id");
         String courseIdStr = req.getParameter("courseId");
         String moduleIdStr = req.getParameter("moduleId");
+        boolean isAjax = "XMLHttpRequest".equalsIgnoreCase(req.getHeader("X-Requested-With"))
+                || (req.getHeader("Accept") != null && req.getHeader("Accept").contains("application/json"))
+                || "true".equalsIgnoreCase(req.getParameter("ajax"));
         try {
             if (quizIdStr != null) {
                 quizService.deleteQuiz(Long.parseLong(quizIdStr));
+            }
+            if (isAjax) {
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"success\":true,\"message\":\"Đã xóa bài kiểm tra thành công!\"}");
+                return;
             }
             if (courseIdStr != null && !courseIdStr.trim().isEmpty()) {
                 resp.sendRedirect(
@@ -257,6 +265,12 @@ public class QuizServlet extends HttpServlet {
                 resp.sendRedirect(req.getContextPath() + "/quizzes/list?moduleId=" + moduleIdStr + "&success=deleted");
             }
         } catch (Exception e) {
+            if (isAjax) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"success\":false,\"message\":\"" + (e.getMessage() != null ? e.getMessage().replace("\"", "\\\"") : "Lỗi khi xóa bài kiểm tra.") + "\"}");
+                return;
+            }
             String redirectUrl = req.getContextPath() + "/quizzes/list?";
             if (courseIdStr != null && !courseIdStr.trim().isEmpty()) {
                 redirectUrl += "courseId=" + courseIdStr.trim();
@@ -324,9 +338,17 @@ public class QuizServlet extends HttpServlet {
         String qIdStr = req.getParameter("id");
         String courseIdStr = req.getParameter("courseId");
         String moduleIdStr = req.getParameter("moduleId");
+        boolean isAjax = "XMLHttpRequest".equalsIgnoreCase(req.getHeader("X-Requested-With"))
+                || (req.getHeader("Accept") != null && req.getHeader("Accept").contains("application/json"))
+                || "true".equalsIgnoreCase(req.getParameter("ajax"));
         try {
             if (qIdStr != null) {
                 quizService.deleteQuestion(Long.parseLong(qIdStr));
+            }
+            if (isAjax) {
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"success\":true,\"message\":\"Đã xóa câu hỏi khỏi ngân hàng thành công!\"}");
+                return;
             }
             if (courseIdStr != null && !courseIdStr.trim().isEmpty()) {
                 resp.sendRedirect(req.getContextPath() + "/quizzes/list?courseId=" + courseIdStr.trim()
@@ -336,6 +358,12 @@ public class QuizServlet extends HttpServlet {
             resp.sendRedirect(req.getContextPath() + "/quizzes/list?moduleId=" + moduleIdStr
                     + "&tab=questions&success=question_deleted");
         } catch (Exception e) {
+            if (isAjax) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"success\":false,\"message\":\"" + (e.getMessage() != null ? e.getMessage().replace("\"", "\\\"") : "Lỗi khi xóa câu hỏi.") + "\"}");
+                return;
+            }
             String redirectUrl = req.getContextPath() + "/quizzes/list?";
             if (courseIdStr != null && !courseIdStr.trim().isEmpty()) {
                 redirectUrl += "courseId=" + courseIdStr.trim() + "&tab=questions";
@@ -384,7 +412,16 @@ public class QuizServlet extends HttpServlet {
         String quizIdStr = req.getParameter("quizId");
         String questionIdStr = req.getParameter("questionId");
         String courseIdStr = req.getParameter("courseId");
+        boolean isAjax = "XMLHttpRequest".equalsIgnoreCase(req.getHeader("X-Requested-With"))
+                || (req.getHeader("Accept") != null && req.getHeader("Accept").contains("application/json"))
+                || "true".equalsIgnoreCase(req.getParameter("ajax"));
         if (quizIdStr == null || questionIdStr == null) {
+            if (isAjax) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"success\":false,\"message\":\"Thiếu tham số hợp lệ.\"}");
+                return;
+            }
             resp.sendRedirect(req.getContextPath() + "/quizzes/list?error=invalid_params");
             return;
         }
@@ -392,12 +429,23 @@ public class QuizServlet extends HttpServlet {
         long questionId = Long.parseLong(questionIdStr.trim());
         try {
             quizService.removeQuestion(quizId, questionId);
+            if (isAjax) {
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"success\":true,\"message\":\"Đã gỡ câu hỏi khỏi bài thi thành công!\"}");
+                return;
+            }
             String target = req.getContextPath() + "/quizzes/detail?id=" + quizId;
             if (courseIdStr != null && !courseIdStr.trim().isEmpty()) {
                 target += "&courseId=" + courseIdStr.trim();
             }
             resp.sendRedirect(target + "&success=removed");
         } catch (Exception e) {
+            if (isAjax) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"success\":false,\"message\":\"" + (e.getMessage() != null ? e.getMessage().replace("\"", "\\\"") : "Lỗi khi gỡ câu hỏi.") + "\"}");
+                return;
+            }
             String target = req.getContextPath() + "/quizzes/detail?id=" + quizId;
             if (courseIdStr != null && !courseIdStr.trim().isEmpty()) {
                 target += "&courseId=" + courseIdStr.trim();

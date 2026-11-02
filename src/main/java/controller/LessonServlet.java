@@ -631,7 +631,16 @@ public class LessonServlet extends HttpServlet {
      */
     private void deleteCourse(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         UserDto currentUser = SessionUtil.getCurrentUser(req);
+        boolean isAjax = "XMLHttpRequest".equalsIgnoreCase(req.getHeader("X-Requested-With"))
+                || (req.getHeader("Accept") != null && req.getHeader("Accept").contains("application/json"))
+                || "true".equalsIgnoreCase(req.getParameter("ajax"));
         if (currentUser == null) {
+            if (isAjax) {
+                resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"success\":false,\"message\":\"Vui lòng đăng nhập để thực hiện.\"}");
+                return;
+            }
             resp.sendRedirect(req.getContextPath() + "/auth/login");
             return;
         }
@@ -640,8 +649,19 @@ public class LessonServlet extends HttpServlet {
             try {
                 long courseId = Long.parseLong(idStr.trim());
                 courseService.deleteCourse(courseId, currentUser);
+                if (isAjax) {
+                    resp.setContentType("application/json;charset=UTF-8");
+                    resp.getWriter().write("{\"success\":true,\"message\":\"Đã xóa vĩnh viễn khóa học nháp thành công!\"}");
+                    return;
+                }
                 SessionUtil.setFlashSuccess(req, "Đã xóa vĩnh viễn khóa học nháp thành công!");
             } catch (Exception e) {
+                if (isAjax) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    resp.setContentType("application/json;charset=UTF-8");
+                    resp.getWriter().write("{\"success\":false,\"message\":\"" + (e.getMessage() != null ? e.getMessage().replace("\"", "\\\"") : "Lỗi khi xóa khóa học.") + "\"}");
+                    return;
+                }
                 SessionUtil.setFlashError(req, e.getMessage());
             }
         }
@@ -1275,7 +1295,16 @@ public class LessonServlet extends HttpServlet {
      */
     private void deleteModule(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         UserDto currentUser = SessionUtil.getCurrentUser(req);
+        boolean isAjax = "XMLHttpRequest".equalsIgnoreCase(req.getHeader("X-Requested-With"))
+                || (req.getHeader("Accept") != null && req.getHeader("Accept").contains("application/json"))
+                || "true".equalsIgnoreCase(req.getParameter("ajax"));
         if (currentUser == null) {
+            if (isAjax) {
+                resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"success\":false,\"message\":\"Vui lòng đăng nhập để thực hiện.\"}");
+                return;
+            }
             resp.sendRedirect(req.getContextPath() + "/auth/login");
             return;
         }
@@ -1288,9 +1317,20 @@ public class LessonServlet extends HttpServlet {
                 courseService.checkModuleOwnership(modId, currentUser);
                 courseService.checkModuleEditable(modId);
                 courseService.deleteModule(modId);
+                if (isAjax) {
+                    resp.setContentType("application/json;charset=UTF-8");
+                    resp.getWriter().write("{\"success\":true,\"message\":\"Đã xóa chương học thành công!\"}");
+                    return;
+                }
                 SessionUtil.setFlashSuccess(req, "Đã xóa chương học thành công!");
             }
         } catch (Exception e) {
+            if (isAjax) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"success\":false,\"message\":\"" + (e.getMessage() != null ? e.getMessage().replace("\"", "\\\"") : "Lỗi khi xóa chương học.") + "\"}");
+                return;
+            }
             SessionUtil.setFlashError(req, e.getMessage());
         }
         resp.sendRedirect(req.getContextPath() + "/expert/lessons?courseId=" + (courseIdStr != null ? courseIdStr : ""));

@@ -975,7 +975,7 @@ body {
                             </c:when>
                             <c:otherwise>
                                 <c:forEach var="c" items="${courses}">
-                                    <tr class="course-row" 
+                                    <tr class="course-row" id="courseRow-${c.id}" 
                                         data-status="${c.status}" 
                                         data-title="${fn:escapeXml(c.title)}" 
                                         data-category="${fn:escapeXml(c.categoryName != null ? c.categoryName : '')}">
@@ -1156,7 +1156,7 @@ body {
                                                                 <li><hr class="dropdown-divider my-1"></li>
                                                                 <li>
                                                                     <a class="saas-dropdown-item text-danger" href="javascript:void(0)"
-                                                                       onclick="confirmDeleteCourse('${fn:escapeXml(c.title)}', '${pageContext.request.contextPath}/expert/delete-course?id=${c.id}')">
+                                                                       onclick="startDeleteCourseCountdown('${c.id}', '${fn:escapeXml(c.title)}')">
                                                                         <i class="bi bi-trash3 text-danger"></i>Xóa vĩnh viễn (Nháp)
                                                                     </a>
                                                                 </li>
@@ -1194,6 +1194,28 @@ body {
         </div>
     </div>
 </main>
+
+
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                <button type="button" class="btn btn-warning btn-sm fw-bold px-3 py-1.5 rounded-pill shadow-sm d-inline-flex align-items-center gap-1.5" onclick="rollbackDelete()" style="font-size: 12px;">
+                    <i class="bi bi-arrow-counterclockwise fs-6"></i>
+                    <span>Hoàn tác (<strong id="undoCountdownSeconds">5</strong>s)</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm text-white-50 border-0 p-1" onclick="commitDeleteNow()" title="Xóa ngay lập tức">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
+        <div class="d-flex align-items-center justify-content-between text-muted mt-1 px-1" style="font-size: 11px;">
+            <span><i class="bi bi-keyboard me-1 text-light"></i>Bấm <kbd class="bg-dark text-white border border-secondary px-1.5 py-0.5 rounded">Ctrl</kbd> + <kbd class="bg-dark text-white border border-secondary px-1.5 py-0.5 rounded">Z</kbd> để hoàn tác</span>
+            <span id="undoStatusText" class="text-warning-emphasis">Hủy sau 5s...</span>
+        </div>
+        <!-- Countdown Progress Bar -->
+        <div class="progress mt-2" style="height: 3px; background-color: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden;">
+            <div id="undoProgressBar" class="progress-bar bg-warning" role="progressbar" style="width: 100%; transition: width 0.05s linear;"></div>
+        </div>
+    </div>
+</div>
 
 <!-- New Course Modal (Redesigned Minimalist SaaS Modal) -->
 <div class="modal fade" id="newCourseModal" tabindex="-1" aria-labelledby="newCourseModalLabel" aria-hidden="true" data-bs-backdrop="static">
@@ -2356,17 +2378,10 @@ body {
     function deleteEditingCourse() {
         const id = document.getElementById('editCourseId').value;
         const title = document.getElementById('editCourseTitle').value;
-        showConfirmModal({
-            title: 'Xác nhận xóa khóa học nháp',
-            method: 'POST',
-            html: 'Bạn có chắc chắn muốn xóa vĩnh viễn khóa học nháp "<strong>' + (title || '') + '</strong>" (cùng toàn bộ bài học bên trong)?<br><span class="text-danger small mt-2 d-inline-block"><i class="bi bi-exclamation-triangle me-1"></i>Thao tác này sẽ xóa vĩnh viễn khỏi hệ thống và không thể khôi phục.</span>',
-            type: 'danger',
-            icon: 'bi bi-trash3-fill',
-            confirmText: 'Xóa vĩnh viễn',
-            confirmIcon: 'bi bi-trash3 me-1',
-            confirmBtnClass: 'btn-danger',
-            confirmUrl: '${pageContext.request.contextPath}/expert/delete-course?id=' + encodeURIComponent(id)
-        });
+        const modalEl = document.getElementById('editCourseModal');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+        startDeleteCourseCountdown(id, title);
     }
 
     function confirmPublishCourse(title, url) {
@@ -2425,7 +2440,25 @@ body {
         });
     }
 
+    // ==========================================
+    // KHÓA HỌC: ROLLBACK QUA COURSONROLLBACK
+    // ==========================================
+    function startDeleteCourseCountdown(courseId, courseTitle) {
+        CoursonRollback.start({
+            element: 'courseRow-' + courseId,
+            type: 'Khóa học',
+            title: courseTitle,
+            endpoint: '${pageContext.request.contextPath}/expert/delete-course',
+            body: 'id=' + encodeURIComponent(courseId) + '&ajax=true'
+        });
+    }
+
     function confirmDeleteCourse(title, url) {
+        const match = url.match(/[?&]id=([^&]+)/);
+        if (match) {
+            startDeleteCourseCountdown(decodeURIComponent(match[1]), title);
+            return;
+        }
         showConfirmModal({
             title: 'Xác nhận xóa khóa học nháp',
             method: 'POST',

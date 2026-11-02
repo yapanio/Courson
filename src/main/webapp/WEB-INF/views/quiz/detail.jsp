@@ -842,7 +842,7 @@ body {
                                     </button>
                                 </c:when>
                                 <c:otherwise>
-                                    <button type="button" class="btn-saas-outline text-danger justify-content-start py-2" data-bs-toggle="modal" data-bs-target="#deleteQuizModal">
+                                    <button type="button" class="btn-saas-outline text-danger justify-content-start py-2" onclick="startDeleteQuizDetailCountdown('${quiz.id}', '${fn:escapeXml(quiz.title)}', '${courseId}')">
                                         <i class="bi bi-trash3 me-2"></i>Xóa bài thi này
                                     </button>
                                 </c:otherwise>
@@ -959,7 +959,7 @@ body {
                             <c:otherwise>
                                 <div class="d-flex flex-column gap-3" id="quizQuestionsContainer">
                                     <c:forEach var="qq" items="${quiz.questions}" varStatus="status">
-                                        <div class="question-item-card p-3 p-md-4"
+                                        <div class="question-item-card p-3 p-md-4" id="questionCard-${qq.id}"
                                              data-question-text="${fn:toLowerCase(fn:escapeXml(qq.questionText))}"
                                              data-question-type="${qq.questionType}"
                                              data-q-id="${qq.id}"
@@ -1065,11 +1065,11 @@ body {
                                                                     <c:param name="courseId" value="${courseId}"/>
                                                                 </c:if>
                                                             </c:url>
-                                                            <a href="${removeUrl}" class="btn-icon-action text-danger" 
-                                                               onclick="return confirm('Bạn có chắc muốn gỡ câu hỏi này khỏi bài thi? (Câu hỏi vẫn được giữ nguyên an toàn trong Ngân hàng câu hỏi)');"
-                                                               title="Gỡ khỏi bài thi">
+                                                            <button type="button" class="btn-icon-action text-danger border-0 bg-transparent" 
+                                                               onclick="startRemoveQuestionCountdown('${qq.id}', '${fn:escapeXml(qq.questionText)}', '${quiz.id}', '${courseId}')"
+                                                               title="Gỡ khỏi bài thi (Có 5s để Hoàn tác / Rollback bằng Ctrl+Z)">
                                                                 <i class="bi bi-trash3"></i>
-                                                            </a>
+                                                            </button>
                                                         </c:otherwise>
                                                     </c:choose>
                                                 </div>
@@ -1403,9 +1403,9 @@ body {
                             <c:param name="moduleId" value="${quiz.moduleId}"/>
                         </c:if>
                     </c:url>
-                    <a href="${deleteQuizUrl}" class="btn btn-danger btn-sm fw-semibold rounded-3 px-3">
+                    <button type="button" class="btn btn-danger btn-sm fw-semibold rounded-3 px-3" onclick="bootstrap.Modal.getInstance(document.getElementById('deleteQuizModal')).hide(); startDeleteQuizDetailCountdown('${quiz.id}', '${fn:escapeXml(quiz.title)}', '${courseId}')">
                         <i class="bi bi-trash3 me-1"></i>Xóa bài thi
-                    </a>
+                    </button>
                 </div>
             </div>
         </div>
@@ -1768,6 +1768,49 @@ body {
             if (textA && textA.value === 'Đúng (True)') textA.value = '';
             if (textB && textB.value === 'Sai (False)') textB.value = '';
         }
+    }
+
+    // ==========================================
+    // ROLLBACK CHO QUIZ DETAIL QUA COURSONROLLBACK
+    // ==========================================
+    function startRemoveQuestionCountdown(qId, qText, quizId, courseId) {
+        let bodyData = 'quizId=' + encodeURIComponent(quizId)
+            + '&questionId=' + encodeURIComponent(qId)
+            + (courseId ? '&courseId=' + encodeURIComponent(courseId) : '')
+            + '&ajax=true';
+
+        CoursonRollback.start({
+            element: 'questionCard-' + qId,
+            type: 'Gỡ câu hỏi',
+            title: qText,
+            endpoint: '${pageContext.request.contextPath}/quizzes/remove-question',
+            body: bodyData,
+            onRollback: function(card) {
+                if (window.CoursonToast) {
+                    window.CoursonToast.show('success', 'Đã hoàn tác (Rollback)! Câu hỏi "' + qText + '" vẫn được giữ trong bài thi.');
+                }
+            }
+        });
+    }
+
+    function startDeleteQuizDetailCountdown(quizId, quizTitle, courseId) {
+        let bodyData = 'id=' + encodeURIComponent(quizId)
+            + (courseId ? '&courseId=' + encodeURIComponent(courseId) : '')
+            + '&ajax=true';
+
+        CoursonRollback.start({
+            element: document.querySelector('.saas-card'),
+            type: 'Bài thi',
+            title: quizTitle,
+            endpoint: '${pageContext.request.contextPath}/quizzes/delete',
+            body: bodyData,
+            onSuccess: function(data) {
+                let redirectUrl = '${pageContext.request.contextPath}/quizzes/list?';
+                if (courseId) redirectUrl += 'courseId=' + encodeURIComponent(courseId) + '&';
+                redirectUrl += 'success=deleted';
+                window.location.href = redirectUrl;
+            }
+        });
     }
 </script>
 
